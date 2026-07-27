@@ -4,59 +4,753 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>CHASE 404</title>
+
 <style>
-html,body{margin:0;height:100%;overflow:hidden;background:#08090c;color:#fff;font-family:Arial,sans-serif}
-canvas{display:block}
-#ui{position:fixed;inset:0;pointer-events:none}
-#top{position:absolute;top:14px;left:14px;background:#111a;padding:10px 14px;border-radius:12px}
-#status{font-weight:bold}.small{font-size:12px;opacity:.7;margin-top:4px}
-#menu{pointer-events:auto;position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle,#1c2230,#07080a 65%)}
-.card{width:min(420px,calc(100% - 40px));padding:28px;border:1px solid #ffffff22;border-radius:20px;background:#1118;text-align:center}
-h1{margin:0 0 8px;font-size:42px;letter-spacing:4px}
-p{opacity:.75}
-input,button{width:100%;box-sizing:border-box;padding:13px;margin-top:10px;border-radius:10px;border:1px solid #ffffff22;background:#0b0d12;color:white;font-size:16px}
-button{cursor:pointer;background:#fff;color:#111;font-weight:bold}
-#hint{font-size:12px;opacity:.65;margin-top:10px}
+html,body{
+  margin:0;
+  height:100%;
+  overflow:hidden;
+  background:#08090c;
+  color:#fff;
+  font-family:Arial,sans-serif
+}
+
+canvas{
+  display:block
+}
+
+#ui{
+  position:fixed;
+  inset:0;
+  pointer-events:none
+}
+
+#top{
+  position:absolute;
+  top:14px;
+  left:14px;
+  background:#111a;
+  padding:10px 14px;
+  border-radius:12px
+}
+
+#status{
+  font-weight:bold
+}
+
+.small{
+  font-size:12px;
+  opacity:.7;
+  margin-top:4px
+}
+
+#menu{
+  pointer-events:auto;
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:radial-gradient(circle,#1c2230,#07080a 65%)
+}
+
+.card{
+  width:min(420px,calc(100% - 40px));
+  padding:28px;
+  border:1px solid #ffffff22;
+  border-radius:20px;
+  background:#1118;
+  text-align:center
+}
+
+h1{
+  margin:0 0 8px;
+  font-size:42px;
+  letter-spacing:4px
+}
+
+p{
+  opacity:.75
+}
+
+input,button{
+  width:100%;
+  box-sizing:border-box;
+  padding:13px;
+  margin-top:10px;
+  border-radius:10px;
+  border:1px solid #ffffff22;
+  background:#0b0d12;
+  color:white;
+  font-size:16px
+}
+
+button{
+  cursor:pointer;
+  background:#fff;
+  color:#111;
+  font-weight:bold
+}
+
+#hint{
+  font-size:12px;
+  opacity:.65;
+  margin-top:10px
+}
 </style>
 </head>
+
 <body>
-<div id="menu"><div class="card">
-<h1>CHASE 404</h1>
-<p>3D 멀티플레이 술래잡기</p>
-<input id="roomInput" placeholder="방 코드 (비워두면 새 방)" maxlength="12">
-<button id="playBtn">게임 시작 / 방 만들기</button>
-<div id="hint">WASD 이동 · 마우스 시점 · 클릭으로 시점 잠금</div>
-</div></div>
-<div id="ui"><div id="top"><div id="status">연결 중...</div><div class="small" id="roomText"></div></div></div>
+
+<div id="menu">
+  <div class="card">
+    <h1>CHASE 404</h1>
+    <p>3D 멀티플레이 술래잡기</p>
+
+    <input
+      id="roomInput"
+      placeholder="방 코드 (비워두면 새 방)"
+      maxlength="12"
+    >
+
+    <button id="playBtn">
+      게임 시작 / 방 만들기
+    </button>
+
+    <div id="hint">
+      WASD 이동 · 마우스 시점 · 클릭으로 시점 잠금
+    </div>
+  </div>
+</div>
+
+<div id="ui">
+  <div id="top">
+    <div id="status">서버 연결 중...</div>
+    <div class="small" id="roomText"></div>
+  </div>
+</div>
+
 <script src="/socket.io/socket.io.js"></script>
+
 <script type="module">
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.178.0/build/three.module.js';
-const socket=io(), menu=document.querySelector('#menu'), playBtn=document.querySelector('#playBtn');
-const roomInput=document.querySelector('#roomInput'), statusEl=document.querySelector('#status'), roomText=document.querySelector('#roomText');
-let started=false,myId='',keys={},meshes=new Map();
-const local={x:0,z:0,rot:0};
-const scene=new THREE.Scene();scene.background=new THREE.Color(0x08090c);scene.fog=new THREE.Fog(0x08090c,35,120);
-const camera=new THREE.PerspectiveCamera(70,innerWidth/innerHeight,.1,300);
-const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,2));document.body.appendChild(renderer.domElement);
-scene.add(new THREE.HemisphereLight(0xffffff,0x223344,2));
-const sun=new THREE.DirectionalLight(0xffffff,2);sun.position.set(20,30,10);scene.add(sun);
-const floor=new THREE.Mesh(new THREE.BoxGeometry(100,1,100),new THREE.MeshStandardMaterial({color:0x30343c}));floor.position.y=-.5;scene.add(floor);
-const wallMat=new THREE.MeshStandardMaterial({color:0x555b66});
-function wall(x,z,w,d){const m=new THREE.Mesh(new THREE.BoxGeometry(w,5,d),wallMat);m.position.set(x,2.5,z);scene.add(m)}
-wall(0,-50,100,2);wall(0,50,100,2);wall(-50,0,2,100);wall(50,0,2,100);
-for(let i=0;i<14;i++){let b=new THREE.Mesh(new THREE.BoxGeometry(3+Math.random()*4,2+Math.random()*4,3+Math.random()*4),wallMat);b.position.set(Math.random()*80-40,b.geometry.parameters.height/2,Math.random()*80-40);scene.add(b)}
-function makePlayer(id,p){let g=new THREE.Group();let body=new THREE.Mesh(new THREE.CapsuleGeometry(.45,1,6,12),new THREE.MeshStandardMaterial({color:p.it?0xff3b30:0x36a3ff}));body.position.y=1;g.add(body);return g}
-function sync(data){for(const [id,p] of Object.entries(data)){if(!meshes.has(id)){let m=makePlayer(id,p);scene.add(m);meshes.set(id,m)}let m=meshes.get(id);m.position.set(p.x,0,p.z);m.rotation.y=p.rot||0;m.children[0].material.color.setHex(p.it?0xff3b30:0x36a3ff)}for(const [id,m] of meshes)if(!data[id]){scene.remove(m);meshes.delete(id)}}
-socket.on('connect',()=>statusEl.textContent='서버 연결됨');
-socket.on('joined',d=>{started=true;myId=d.id;menu.style.display='none';roomText.textContent='방 코드: '+d.room});
-socket.on('state',d=>{sync(d.players);statusEl.textContent=`접속자 ${Object.keys(d.players).length}명 · ${d.chaser?'술래: '+d.chaser.slice(0,5):'술래 선정 중'}`});
-socket.on('errorMessage',m=>alert(m));
-playBtn.onclick=()=>socket.emit('joinRoom',(roomInput.value||'').trim().toUpperCase());
-addEventListener('keydown',e=>keys[e.key.toLowerCase()]=true);addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
-renderer.domElement.onclick=()=>renderer.domElement.requestPointerLock();
-addEventListener('mousemove',e=>{if(document.pointerLockElement===renderer.domElement)local.rot-=e.movementX*.0025});
-const clock=new THREE.Clock();
-function animate(){requestAnimationFrame(animate);let dt=Math.min(clock.getDelta(),.05);if(started){let x=(keys.d?1:0)-(keys.a?1:0),z=(keys.s?1:0)-(keys.w?1:0),l=Math.hypot(x,z)||1;x/=l;z/=l;local.x=Math.max(-47,Math.min(47,local.x+x*7*dt));local.z=Math.max(-47,Math.min(47,local.z+z*7*dt));socket.emit('move',local);camera.position.set(local.x,5.5,local.z+9);camera.lookAt(local.x,1,local.z)}renderer.render(scene,camera)}
-animate();addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+
+import * as THREE from
+'https://cdn.jsdelivr.net/npm/three@0.178.0/build/three.module.js';
+
+const socket = io();
+
+const menu = document.querySelector('#menu');
+const playBtn = document.querySelector('#playBtn');
+const roomInput = document.querySelector('#roomInput');
+
+const statusEl = document.querySelector('#status');
+const roomText = document.querySelector('#roomText');
+
+let started = false;
+let myId = '';
+
+const keys = {};
+
+const meshes = new Map();
+
+const local = {
+  x:0,
+  z:0,
+  rot:0
+};
+
+let yaw = 0;
+let pitch = -0.15;
+
+const scene = new THREE.Scene();
+
+scene.background =
+new THREE.Color(0x08090c);
+
+scene.fog =
+new THREE.Fog(0x08090c,35,120);
+
+const camera =
+new THREE.PerspectiveCamera(
+  70,
+  innerWidth/innerHeight,
+  .1,
+  300
+);
+
+const renderer =
+new THREE.WebGLRenderer({
+  antialias:true
+});
+
+renderer.setSize(
+  innerWidth,
+  innerHeight
+);
+
+renderer.setPixelRatio(
+  Math.min(devicePixelRatio,2)
+);
+
+document.body.appendChild(
+  renderer.domElement
+);
+
+scene.add(
+  new THREE.HemisphereLight(
+    0xffffff,
+    0x223344,
+    2
+  )
+);
+
+const sun =
+new THREE.DirectionalLight(
+  0xffffff,
+  2
+);
+
+sun.position.set(
+  20,
+  30,
+  10
+);
+
+scene.add(sun);
+
+
+// 바닥
+
+const floor =
+new THREE.Mesh(
+  new THREE.BoxGeometry(
+    100,
+    1,
+    100
+  ),
+  new THREE.MeshStandardMaterial({
+    color:0x30343c
+  })
+);
+
+floor.position.y = -0.5;
+
+scene.add(floor);
+
+
+// 벽
+
+const wallMat =
+new THREE.MeshStandardMaterial({
+  color:0x555b66
+});
+
+const obstacles = [];
+
+function wall(x,z,w,d){
+
+  const m =
+  new THREE.Mesh(
+    new THREE.BoxGeometry(
+      w,
+      5,
+      d
+    ),
+    wallMat
+  );
+
+  m.position.set(
+    x,
+    2.5,
+    z
+  );
+
+  scene.add(m);
+
+  obstacles.push({
+    x,
+    z,
+    w,
+    d
+  });
+}
+
+wall(0,-50,100,2);
+wall(0,50,100,2);
+wall(-50,0,2,100);
+wall(50,0,2,100);
+
+
+// 조형물
+
+for(let i=0;i<14;i++){
+
+  const w =
+  3 + Math.random()*4;
+
+  const h =
+  2 + Math.random()*4;
+
+  const d =
+  3 + Math.random()*4;
+
+  const x =
+  Math.random()*80-40;
+
+  const z =
+  Math.random()*80-40;
+
+  const b =
+  new THREE.Mesh(
+    new THREE.BoxGeometry(
+      w,
+      h,
+      d
+    ),
+    wallMat
+  );
+
+  b.position.set(
+    x,
+    h/2,
+    z
+  );
+
+  scene.add(b);
+
+  obstacles.push({
+    x,
+    z,
+    w,
+    d
+  });
+}
+
+
+// 충돌 검사
+
+function blocked(x,z){
+
+  const radius = 0.7;
+
+  for(const o of obstacles){
+
+    const minX =
+    o.x - o.w/2 - radius;
+
+    const maxX =
+    o.x + o.w/2 + radius;
+
+    const minZ =
+    o.z - o.d/2 - radius;
+
+    const maxZ =
+    o.z + o.d/2 + radius;
+
+    if(
+      x > minX &&
+      x < maxX &&
+      z > minZ &&
+      z < maxZ
+    ){
+      return true;
+    }
+  }
+
+  return false;
+}
+
+
+// 플레이어
+
+function makePlayer(id,p){
+
+  const g =
+  new THREE.Group();
+
+  const body =
+  new THREE.Mesh(
+    new THREE.CapsuleGeometry(
+      .45,
+      1,
+      6,
+      12
+    ),
+    new THREE.MeshStandardMaterial({
+      color:
+      p.it
+      ? 0xff3b30
+      : 0x36a3ff
+    })
+  );
+
+  // 바닥에 제대로 서도록 수정
+  body.position.y = 1;
+
+  g.add(body);
+
+  return g;
+}
+
+
+// 플레이어 동기화
+
+function sync(data){
+
+  for(
+    const [id,p]
+    of Object.entries(data)
+  ){
+
+    if(!meshes.has(id)){
+
+      const m =
+      makePlayer(id,p);
+
+      scene.add(m);
+
+      meshes.set(id,m);
+    }
+
+    const m =
+    meshes.get(id);
+
+    // 플레이어는 바닥 y=0
+    m.position.set(
+      p.x,
+      0,
+      p.z
+    );
+
+    m.rotation.y =
+    p.rot || 0;
+
+    m.children[0]
+    .material
+    .color
+    .setHex(
+      p.it
+      ? 0xff3b30
+      : 0x36a3ff
+    );
+  }
+
+  for(
+    const [id,m]
+    of meshes
+  ){
+
+    if(!data[id]){
+
+      scene.remove(m);
+
+      meshes.delete(id);
+    }
+  }
+}
+
+
+// 서버 연결
+
+socket.on(
+  'connect',
+  ()=>{
+    statusEl.textContent =
+    '서버 연결됨';
+  }
+);
+
+
+// 입장
+
+socket.on(
+  'joined',
+  d=>{
+
+    started = true;
+
+    myId = d.id;
+
+    menu.style.display =
+    'none';
+
+    roomText.textContent =
+    '방 코드: '+d.room;
+
+    renderer.domElement
+    .requestPointerLock();
+  }
+);
+
+
+// 상태
+
+socket.on(
+  'state',
+  d=>{
+
+    sync(d.players);
+
+    statusEl.textContent =
+    `접속자 ${
+      Object.keys(d.players).length
+    }명 · ${
+      d.chaser
+      ? '술래: '+d.chaser.slice(0,5)
+      : '술래 선정 중'
+    }`;
+  }
+);
+
+
+// 오류
+
+socket.on(
+  'errorMessage',
+  m=>{
+    alert(m);
+  }
+);
+
+
+// 방 입장
+
+playBtn.onclick =
+()=>{
+
+  socket.emit(
+    'joinRoom',
+    (roomInput.value||'')
+    .trim()
+    .toUpperCase()
+  );
+};
+
+
+// 키보드
+
+addEventListener(
+  'keydown',
+  e=>{
+    keys[
+      e.key.toLowerCase()
+    ] = true;
+  }
+);
+
+addEventListener(
+  'keyup',
+  e=>{
+    keys[
+      e.key.toLowerCase()
+    ] = false;
+  }
+);
+
+
+// 마우스 시점
+
+renderer.domElement.onclick =
+()=>{
+
+  renderer.domElement
+  .requestPointerLock();
+};
+
+
+addEventListener(
+  'mousemove',
+  e=>{
+
+    if(
+      document.pointerLockElement
+      !== renderer.domElement
+    ){
+      return;
+    }
+
+    yaw -=
+    e.movementX * 0.0025;
+
+    pitch -=
+    e.movementY * 0.0025;
+
+    pitch =
+    Math.max(
+      -1.2,
+      Math.min(
+        1.2,
+        pitch
+      )
+    );
+  }
+);
+
+
+// 게임 루프
+
+const clock =
+new THREE.Clock();
+
+function animate(){
+
+  requestAnimationFrame(
+    animate
+  );
+
+  const dt =
+  Math.min(
+    clock.getDelta(),
+    .05
+  );
+
+  if(started){
+
+    let forward =
+    (keys.w?1:0) -
+    (keys.s?1:0);
+
+    let right =
+    (keys.d?1:0) -
+    (keys.a?1:0);
+
+    const len =
+    Math.hypot(
+      forward,
+      right
+    ) || 1;
+
+    forward /= len;
+    right /= len;
+
+
+    // 카메라 방향 기준 이동
+
+    const dx =
+    Math.sin(yaw) * forward +
+    Math.cos(yaw) * right;
+
+    const dz =
+    Math.cos(yaw) * forward -
+    Math.sin(yaw) * right;
+
+
+    const speed =
+    7 * dt;
+
+
+    const nextX =
+    local.x + dx * speed;
+
+    const nextZ =
+    local.z + dz * speed;
+
+
+    // X축 충돌 검사
+
+    if(!blocked(nextX,local.z)){
+
+      local.x =
+      Math.max(
+        -47,
+        Math.min(
+          47,
+          nextX
+        )
+      );
+    }
+
+
+    // Z축 충돌 검사
+
+    if(!blocked(local.x,nextZ)){
+
+      local.z =
+      Math.max(
+        -47,
+        Math.min(
+          47,
+          nextZ
+        )
+      );
+    }
+
+
+    local.rot =
+    yaw;
+
+
+    socket.emit(
+      'move',
+      local
+    );
+
+
+    // 카메라
+
+    const distance = 7;
+
+    const camX =
+    local.x -
+    Math.sin(yaw) *
+    Math.cos(pitch) *
+    distance;
+
+    const camY =
+    2.5 +
+    Math.sin(pitch) *
+    distance;
+
+    const camZ =
+    local.z -
+    Math.cos(yaw) *
+    Math.cos(pitch) *
+    distance;
+
+
+    camera.position.set(
+      camX,
+      camY,
+      camZ
+    );
+
+
+    camera.lookAt(
+      local.x,
+      1.2,
+      local.z
+    );
+  }
+
+
+  renderer.render(
+    scene,
+    camera
+  );
+}
+
+
+animate();
+
+
+addEventListener(
+  'resize',
+  ()=>{
+
+    camera.aspect =
+    innerWidth /
+    innerHeight;
+
+    camera.updateProjectionMatrix();
+
+    renderer.setSize(
+      innerWidth,
+      innerHeight
+    );
+  }
+);
+
 </script>
-</body></html>
+
+</body>
+</html>
