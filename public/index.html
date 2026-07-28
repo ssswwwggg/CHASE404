@@ -13,7 +13,7 @@ html,body{
   height:100%;
   overflow:hidden;
   background:#08090c;
-  color:#fff;
+  color:white;
   font-family:Arial,sans-serif;
 }
 
@@ -31,9 +31,9 @@ canvas{
   position:absolute;
   top:14px;
   left:14px;
-  background:#111a;
   padding:10px 14px;
   border-radius:12px;
+  background:#111a;
 }
 
 #status{
@@ -47,13 +47,14 @@ canvas{
 }
 
 #menu{
-  pointer-events:auto;
   position:absolute;
   inset:0;
   display:flex;
   align-items:center;
   justify-content:center;
   background:radial-gradient(circle,#1c2230,#07080a 65%);
+  pointer-events:auto;
+  z-index:10;
 }
 
 .card{
@@ -89,7 +90,7 @@ input,button{
 
 button{
   cursor:pointer;
-  background:#fff;
+  background:white;
   color:#111;
   font-weight:bold;
 }
@@ -105,13 +106,12 @@ button{
 <body>
 
 <div id="menu">
+
   <div class="card">
 
     <h1>CHASE 404</h1>
 
-    <p>
-      3D 멀티플레이 술래잡기
-    </p>
+    <p>3D 멀티플레이 술래잡기</p>
 
     <input
       id="roomInput"
@@ -128,6 +128,7 @@ button{
     </div>
 
   </div>
+
 </div>
 
 
@@ -136,7 +137,7 @@ button{
   <div id="top">
 
     <div id="status">
-      연결 중...
+      서버 연결 중...
     </div>
 
     <div
@@ -157,16 +158,11 @@ import * as THREE from
 'https://cdn.jsdelivr.net/npm/three@0.178.0/build/three.module.js';
 
 
-// ========================================
-// 서버
-// ========================================
+// ======================================
+// 서버 / UI
+// ======================================
 
 const socket = io();
-
-
-// ========================================
-// UI
-// ========================================
 
 const menu =
 document.querySelector('#menu');
@@ -184,9 +180,9 @@ const roomText =
 document.querySelector('#roomText');
 
 
-// ========================================
-// 게임 상태
-// ========================================
+// ======================================
+// 게임 변수
+// ======================================
 
 let started = false;
 
@@ -199,9 +195,9 @@ const players = new Map();
 let obstacles = [];
 
 
-// ========================================
-// 내 위치
-// ========================================
+// ======================================
+// 내 플레이어 위치
+// ======================================
 
 const local = {
 
@@ -214,18 +210,18 @@ const local = {
 };
 
 
-// ========================================
+// ======================================
 // 카메라
-// ========================================
+// ======================================
 
 let yaw = 0;
 
-let pitch = -0.25;
+let pitch = -0.2;
 
 
-// ========================================
+// ======================================
 // THREE
-// ========================================
+// ======================================
 
 const scene =
 new THREE.Scene();
@@ -268,21 +264,25 @@ renderer.setSize(
   innerHeight
 );
 
+
 renderer.setPixelRatio(
+
   Math.min(
     devicePixelRatio,
     2
   )
+
 );
+
 
 document.body.appendChild(
   renderer.domElement
 );
 
 
-// ========================================
+// ======================================
 // 조명
-// ========================================
+// ======================================
 
 scene.add(
 
@@ -308,18 +308,20 @@ new THREE.DirectionalLight(
 
 );
 
+
 sun.position.set(
   20,
   30,
   10
 );
 
+
 scene.add(sun);
 
 
-// ========================================
+// ======================================
 // 바닥
-// ========================================
+// ======================================
 
 const floor =
 new THREE.Mesh(
@@ -338,14 +340,16 @@ new THREE.Mesh(
 
 );
 
+
 floor.position.y = -0.5;
+
 
 scene.add(floor);
 
 
-// ========================================
-// 외벽
-// ========================================
+// ======================================
+// 맵
+// ======================================
 
 const wallMat =
 new THREE.MeshStandardMaterial({
@@ -355,82 +359,58 @@ new THREE.MeshStandardMaterial({
 });
 
 
-function createWall(
-  x,
-  z,
-  w,
-  d
+function createMapObject(
+  o
 ){
 
-  const wall =
+  const mesh =
   new THREE.Mesh(
 
     new THREE.BoxGeometry(
-      w,
-      5,
-      d
+
+      o.w,
+
+      4,
+
+      o.d
+
     ),
 
     wallMat
 
   );
 
-  wall.position.set(
-    x,
-    2.5,
-    z
+
+  mesh.position.set(
+
+    o.x,
+
+    2,
+
+    o.z
+
   );
 
-  wall.userData.mapObject = true;
 
-  scene.add(wall);
+  mesh.userData.mapObject =
+  true;
+
+
+  scene.add(mesh);
 
 }
 
-
-// 외벽
-
-createWall(
-  0,
-  -50,
-  100,
-  2
-);
-
-createWall(
-  0,
-  50,
-  100,
-  2
-);
-
-createWall(
-  -50,
-  0,
-  2,
-  100
-);
-
-createWall(
-  50,
-  0,
-  2,
-  100
-);
-
-
-// ========================================
-// 맵 조형물
-// ========================================
 
 function updateMap(
   newObstacles
 ){
 
   if(
+
     !Array.isArray(
       newObstacles
     )
+
   ){
 
     return;
@@ -442,7 +422,7 @@ function updateMap(
   newObstacles;
 
 
-  // 기존 맵 오브젝트 제거
+  // 기존 맵 오브젝트 삭제
 
   for(
 
@@ -452,8 +432,10 @@ function updateMap(
   ){
 
     if(
+
       child.userData &&
       child.userData.mapObject
+
     ){
 
       scene.remove(child);
@@ -472,57 +454,28 @@ function updateMap(
 
   ){
 
-    const mesh =
-    new THREE.Mesh(
-
-      new THREE.BoxGeometry(
-
-        obstacle.w,
-
-        4,
-
-        obstacle.d
-
-      ),
-
-      wallMat
-
+    createMapObject(
+      obstacle
     );
-
-
-    mesh.position.set(
-
-      obstacle.x,
-
-      2,
-
-      obstacle.z
-
-    );
-
-
-    mesh.userData.mapObject =
-    true;
-
-
-    scene.add(mesh);
 
   }
 
 }
 
 
-// ========================================
-// 충돌 검사
-// ========================================
+// ======================================
+// 충돌
+// ======================================
 
 function blocked(
+
   x,
+
   z
+
 ){
 
-  // 충돌 반경 감소
-  // 벽에 너무 일찍 막히는 문제 수정
+  // 이전 0.7보다 작게 설정
 
   const radius = 0.35;
 
@@ -535,34 +488,49 @@ function blocked(
   ){
 
     const minX =
+
     o.x -
+
     o.w / 2 -
+
     radius;
 
 
     const maxX =
+
     o.x +
+
     o.w / 2 +
+
     radius;
 
 
     const minZ =
+
     o.z -
+
     o.d / 2 -
+
     radius;
 
 
     const maxZ =
+
     o.z +
+
     o.d / 2 +
+
     radius;
 
 
     if(
 
       x > minX &&
+
       x < maxX &&
+
       z > minZ &&
+
       z < maxZ
 
     ){
@@ -579,13 +547,16 @@ function blocked(
 }
 
 
-// ========================================
+// ======================================
 // 플레이어 생성
-// ========================================
+// ======================================
 
 function makePlayer(
+
   id,
+
   data
+
 ){
 
   const group =
@@ -597,12 +568,13 @@ function makePlayer(
   const body =
   new THREE.Mesh(
 
-    new THREE.CapsuleGeometry(
+    new THREE.BoxGeometry(
 
-      0.45,
-      1,
-      6,
-      12
+      0.9,
+
+      2,
+
+      0.9
 
     ),
 
@@ -621,8 +593,6 @@ function makePlayer(
   );
 
 
-  // 바닥에 서도록 설정
-
   body.position.y = 1;
 
 
@@ -635,9 +605,13 @@ function makePlayer(
   new THREE.Mesh(
 
     new THREE.SphereGeometry(
-      0.38,
+
+      0.4,
+
       16,
+
       16
+
     ),
 
     new THREE.MeshStandardMaterial({
@@ -646,27 +620,26 @@ function makePlayer(
 
       data.it
 
-      ? 0xff7770
+      ? 0xff8888
 
-      : 0x77c4ff
+      : 0x88ccff
 
     })
 
   );
 
 
-  head.position.y = 1.9;
+  head.position.y = 2.3;
 
 
   group.add(head);
 
 
-  group.userData.player =
-  true;
+  // 플레이어 표시용 이름 데이터
 
+  group.userData.player = true;
 
-  group.userData.id =
-  id;
+  group.userData.id = id;
 
 
   return group;
@@ -674,13 +647,22 @@ function makePlayer(
 }
 
 
-// ========================================
+// ======================================
 // 플레이어 동기화
-// ========================================
+// ======================================
 
 function syncPlayers(
+
   data
+
 ){
+
+  if(!data){
+
+    return;
+
+  }
+
 
   for(
 
@@ -693,16 +675,38 @@ function syncPlayers(
 
   ){
 
-    // 플레이어가 없으면 생성
+    // 내 플레이어 위치를 서버와 동기화
 
     if(
+
+      id === myId
+
+    ){
+
+      local.x =
+      Number(p.x) || 0;
+
+      local.z =
+      Number(p.z) || 0;
+
+    }
+
+
+    // 캐릭터가 없으면 생성
+
+    if(
+
       !players.has(id)
+
     ){
 
       const mesh =
       makePlayer(
+
         id,
+
         p
+
       );
 
 
@@ -710,8 +714,11 @@ function syncPlayers(
 
 
       players.set(
+
         id,
+
         mesh
+
       );
 
     }
@@ -725,47 +732,54 @@ function syncPlayers(
 
     mesh.position.set(
 
-      p.x,
+      Number(p.x) || 0,
 
       0,
 
-      p.z
+      Number(p.z) || 0
 
     );
 
 
-    // 회전
+    // 방향
 
     mesh.rotation.y =
-    p.rot || 0;
+
+    Number(p.rot) || 0;
 
 
-    // 색
-
-    const color =
-    p.it
-
-    ? 0xff3b30
-
-    : 0x36a3ff;
-
+    // 색 변경
 
     mesh.children[0]
-    .material
-    .color
-    .setHex(color);
 
-
-    mesh.children[1]
     .material
+
     .color
+
     .setHex(
 
       p.it
 
-      ? 0xff7770
+      ? 0xff3b30
 
-      : 0x77c4ff
+      : 0x36a3ff
+
+    );
+
+
+    mesh.children[1]
+
+    .material
+
+    .color
+
+    .setHex(
+
+      p.it
+
+      ? 0xff8888
+
+      : 0x88ccff
 
     );
 
@@ -786,7 +800,9 @@ function syncPlayers(
   ){
 
     if(
+
       !data[id]
+
     ){
 
       scene.remove(mesh);
@@ -800,9 +816,9 @@ function syncPlayers(
 }
 
 
-// ========================================
+// ======================================
 // 서버 연결
-// ========================================
+// ======================================
 
 socket.on(
 
@@ -818,9 +834,9 @@ socket.on(
 );
 
 
-// ========================================
+// ======================================
 // 방 입장
-// ========================================
+// ======================================
 
 socket.on(
 
@@ -838,35 +854,29 @@ socket.on(
 
 
     roomText.textContent =
+
     '방 코드: ' +
     data.room;
 
 
-    // 서버 맵
+    // 서버 맵 적용
 
     if(
+
       data.obstacles
+
     ){
 
       updateMap(
+
         data.obstacles
+
       );
 
     }
 
 
-    // 내 위치를 서버 데이터로 초기화
-
-    if(
-      data.id
-    ){
-
-      local.x = 0;
-
-      local.z = 0;
-
-    }
-
+    // 마우스 시점 잠금
 
     renderer.domElement
     .requestPointerLock();
@@ -876,9 +886,9 @@ socket.on(
 );
 
 
-// ========================================
-// 상태
-// ========================================
+// ======================================
+// 게임 상태
+// ======================================
 
 socket.on(
 
@@ -887,16 +897,22 @@ socket.on(
   data =>{
 
     syncPlayers(
+
       data.players
+
     );
 
 
     if(
+
       data.obstacles
+
     ){
 
       updateMap(
+
         data.obstacles
+
       );
 
     }
@@ -929,9 +945,9 @@ socket.on(
 );
 
 
-// ========================================
+// ======================================
 // 오류
-// ========================================
+// ======================================
 
 socket.on(
 
@@ -946,9 +962,9 @@ socket.on(
 );
 
 
-// ========================================
-// 방 입장
-// ========================================
+// ======================================
+// 방 참가
+// ======================================
 
 playBtn.onclick =
 
@@ -966,6 +982,7 @@ playBtn.onclick =
     )
 
     .trim()
+
     .toUpperCase()
 
   );
@@ -973,18 +990,18 @@ playBtn.onclick =
 };
 
 
-// ========================================
+// ======================================
 // 키보드
-// ========================================
+// ======================================
 
 addEventListener(
 
   'keydown',
 
-  e =>{
+  event =>{
 
     keys[
-      e.key.toLowerCase()
+      event.key.toLowerCase()
     ] = true;
 
   }
@@ -996,10 +1013,10 @@ addEventListener(
 
   'keyup',
 
-  e =>{
+  event =>{
 
     keys[
-      e.key.toLowerCase()
+      event.key.toLowerCase()
     ] = false;
 
   }
@@ -1007,9 +1024,9 @@ addEventListener(
 );
 
 
-// ========================================
+// ======================================
 // 마우스 카메라
-// ========================================
+// ======================================
 
 renderer.domElement.onclick =
 
@@ -1025,7 +1042,7 @@ addEventListener(
 
   'mousemove',
 
-  e =>{
+  event =>{
 
     if(
 
@@ -1041,24 +1058,28 @@ addEventListener(
 
 
     yaw -=
-    e.movementX *
+
+    event.movementX *
+
     0.0025;
 
 
     pitch -=
-    e.movementY *
+
+    event.movementY *
+
     0.0025;
 
 
-    // 카메라가 바닥을 뚫지 않도록
+    // 카메라가 바닥으로 내려가지 않도록
 
     pitch = Math.max(
 
-      -0.65,
+      -0.6,
 
       Math.min(
 
-        0.65,
+        0.6,
 
         pitch
 
@@ -1071,9 +1092,9 @@ addEventListener(
 );
 
 
-// ========================================
+// ======================================
 // 게임 루프
-// ========================================
+// ======================================
 
 const clock =
 new THREE.Clock();
@@ -1087,6 +1108,7 @@ function animate(){
 
 
   const dt =
+
   Math.min(
 
     clock.getDelta(),
@@ -1097,10 +1119,29 @@ function animate(){
 
 
   if(
+
     started
+
   ){
 
-    let x =
+    // ==================================
+    // WASD 정상 방향
+    // W = 앞으로
+    // S = 뒤로
+    // A = 왼쪽
+    // D = 오른쪽
+    // ==================================
+
+    let forward =
+
+    (keys.w ? 1 : 0)
+
+    -
+
+    (keys.s ? 1 : 0);
+
+
+    let right =
 
     (keys.d ? 1 : 0)
 
@@ -1109,51 +1150,48 @@ function animate(){
     (keys.a ? 1 : 0);
 
 
-    let z =
-
-    (keys.s ? 1 : 0)
-
-    -
-
-    (keys.w ? 1 : 0);
-
-
     const length =
 
     Math.hypot(
-      x,
-      z
+
+      forward,
+
+      right
+
     ) || 1;
 
 
-    x /= length;
+    forward /= length;
 
-    z /= length;
+    right /= length;
 
 
-    // 기존 A/D 반전 유지
-
+    // 카메라 방향 기준 이동
 
     const dx =
 
     Math.sin(yaw) *
-    z
+
+    forward
 
     +
 
     Math.cos(yaw) *
-    x;
+
+    right;
 
 
     const dz =
 
     Math.cos(yaw) *
-    z
+
+    forward
 
     -
 
     Math.sin(yaw) *
-    x;
+
+    right;
 
 
     const speed =
@@ -1174,7 +1212,7 @@ function animate(){
     dz * speed;
 
 
-    // X축 충돌
+    // X 충돌
 
     if(
 
@@ -1207,7 +1245,7 @@ function animate(){
     }
 
 
-    // Z축 충돌
+    // Z 충돌
 
     if(
 
@@ -1250,17 +1288,25 @@ function animate(){
 
       'move',
 
-      local
+      {
+
+        x:local.x,
+
+        z:local.z,
+
+        rot:local.rot
+
+      }
 
     );
 
 
     // ==================================
-    // 카메라
+    // 3인칭 카메라
     // ==================================
 
     const distance =
-    7;
+    8;
 
 
     const cameraX =
@@ -1280,15 +1326,13 @@ function animate(){
     distance;
 
 
-    // 바닥 아래로 내려가지 않도록 제한
-
     const cameraY =
 
     Math.max(
 
-      1.4,
+      1.5,
 
-      2.5
+      3.5
 
       +
 
@@ -1333,7 +1377,7 @@ function animate(){
 
       local.x,
 
-      1.2,
+      1.1,
 
       local.z
 
@@ -1356,9 +1400,9 @@ function animate(){
 animate();
 
 
-// ========================================
+// ======================================
 // 화면 크기
-// ========================================
+// ======================================
 
 addEventListener(
 
@@ -1369,6 +1413,7 @@ addEventListener(
     camera.aspect =
 
     innerWidth /
+
     innerHeight;
 
 
