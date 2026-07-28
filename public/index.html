@@ -1,203 +1,110 @@
 <!doctype html>
 <html lang="ko">
-
 <head>
-
 <meta charset="utf-8">
-
-<meta
-  name="viewport"
-  content="width=device-width,initial-scale=1"
->
+<meta name="viewport" content="width=device-width,initial-scale=1">
 
 <title>CHASE 404</title>
 
 <style>
-
-html,
-body{
-
+html,body{
   margin:0;
-
   width:100%;
   height:100%;
-
   overflow:hidden;
-
   background:#08090c;
-
-  color:white;
-
+  color:#fff;
   font-family:Arial,sans-serif;
-
 }
 
 canvas{
-
   display:block;
-
 }
 
 #ui{
-
   position:fixed;
-
   inset:0;
-
   pointer-events:none;
-
 }
 
 #top{
-
   position:absolute;
-
   top:14px;
-
   left:14px;
-
-  padding:10px 14px;
-
-  border-radius:12px;
-
   background:#111a;
-
+  padding:10px 14px;
+  border-radius:12px;
 }
 
 #status{
-
   font-weight:bold;
-
 }
 
 .small{
-
   font-size:12px;
-
   opacity:.7;
-
   margin-top:4px;
-
 }
 
 #menu{
-
-  position:absolute;
-
-  inset:0;
-
-  display:flex;
-
-  align-items:center;
-
-  justify-content:center;
-
-  background:
-  radial-gradient(
-    circle,
-    #1c2230,
-    #07080a 65%
-  );
-
   pointer-events:auto;
-
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:radial-gradient(circle,#1c2230,#07080a 65%);
 }
 
 .card{
-
-  width:min(
-    420px,
-    calc(100% - 40px)
-  );
-
+  width:min(420px,calc(100% - 40px));
   padding:28px;
-
-  border:
-  1px solid
-  #ffffff22;
-
+  border:1px solid #ffffff22;
   border-radius:20px;
-
   background:#1118;
-
   text-align:center;
-
 }
 
 h1{
-
-  margin:
-  0 0 8px;
-
+  margin:0 0 8px;
   font-size:42px;
-
   letter-spacing:4px;
-
 }
 
 p{
-
   opacity:.75;
-
 }
 
-input,
-button{
-
+input,button{
   width:100%;
-
   box-sizing:border-box;
-
   padding:13px;
-
   margin-top:10px;
-
   border-radius:10px;
-
-  border:
-  1px solid
-  #ffffff22;
-
+  border:1px solid #ffffff22;
   background:#0b0d12;
-
   color:white;
-
   font-size:16px;
-
 }
 
 button{
-
   cursor:pointer;
-
-  background:white;
-
+  background:#fff;
   color:#111;
-
   font-weight:bold;
-
 }
 
 #hint{
-
   font-size:12px;
-
   opacity:.65;
-
   margin-top:10px;
-
 }
-
 </style>
-
 </head>
-
 
 <body>
 
-
 <div id="menu">
-
   <div class="card">
 
     <h1>CHASE 404</h1>
@@ -213,19 +120,14 @@ button{
     >
 
     <button id="playBtn">
-
       게임 시작 / 방 만들기
-
     </button>
 
     <div id="hint">
-
-      WASD 이동 · 마우스 시점
-
+      WASD 이동 · 마우스 시점 · 클릭으로 시점 잠금
     </div>
 
   </div>
-
 </div>
 
 
@@ -234,9 +136,7 @@ button{
   <div id="top">
 
     <div id="status">
-
-      서버 연결 중...
-
+      연결 중...
     </div>
 
     <div
@@ -251,80 +151,59 @@ button{
 
 <script src="/socket.io/socket.io.js"></script>
 
-
 <script type="module">
-
 
 import * as THREE from
 'https://cdn.jsdelivr.net/npm/three@0.178.0/build/three.module.js';
 
 
-// ==========================
-// 기본 변수
-// ==========================
+// ========================================
+// 서버
+// ========================================
+
+const socket = io();
 
 
-const socket =
-io();
-
+// ========================================
+// UI
+// ========================================
 
 const menu =
-document.querySelector(
-  '#menu'
-);
-
+document.querySelector('#menu');
 
 const playBtn =
-document.querySelector(
-  '#playBtn'
-);
-
+document.querySelector('#playBtn');
 
 const roomInput =
-document.querySelector(
-  '#roomInput'
-);
-
+document.querySelector('#roomInput');
 
 const statusEl =
-document.querySelector(
-  '#status'
-);
-
+document.querySelector('#status');
 
 const roomText =
-document.querySelector(
-  '#roomText'
-);
+document.querySelector('#roomText');
 
 
-let started =
-false;
+// ========================================
+// 게임 상태
+// ========================================
+
+let started = false;
+
+let myId = '';
+
+const keys = {};
+
+const players = new Map();
+
+let obstacles = [];
 
 
-let myId =
-'';
+// ========================================
+// 내 위치
+// ========================================
 
-
-const keys =
-{};
-
-
-const players =
-new Map();
-
-
-let obstacles =
-[];
-
-
-// ==========================
-// 플레이어 위치
-// ==========================
-
-
-const local =
-{
+const local = {
 
   x:0,
 
@@ -335,33 +214,24 @@ const local =
 };
 
 
-// ==========================
-// 카메라 회전
-// ==========================
+// ========================================
+// 카메라
+// ========================================
+
+let yaw = 0;
+
+let pitch = -0.25;
 
 
-let yaw =
-0;
-
-
-let pitch =
--0.25;
-
-
-// ==========================
-// THREE 기본 설정
-// ==========================
-
+// ========================================
+// THREE
+// ========================================
 
 const scene =
 new THREE.Scene();
 
-
 scene.background =
-new THREE.Color(
-  0x08090c
-);
-
+new THREE.Color(0x08090c);
 
 scene.fog =
 new THREE.Fog(
@@ -376,8 +246,7 @@ new THREE.PerspectiveCamera(
 
   70,
 
-  innerWidth /
-  innerHeight,
+  innerWidth / innerHeight,
 
   0.1,
 
@@ -395,35 +264,25 @@ new THREE.WebGLRenderer({
 
 
 renderer.setSize(
-
   innerWidth,
-
   innerHeight
-
 );
 
-
 renderer.setPixelRatio(
-
   Math.min(
     devicePixelRatio,
     2
   )
-
 );
-
 
 document.body.appendChild(
-
   renderer.domElement
-
 );
 
 
-// ==========================
+// ========================================
 // 조명
-// ==========================
-
+// ========================================
 
 scene.add(
 
@@ -441,7 +300,6 @@ scene.add(
 
 
 const sun =
-
 new THREE.DirectionalLight(
 
   0xffffff,
@@ -450,142 +308,129 @@ new THREE.DirectionalLight(
 
 );
 
-
 sun.position.set(
-
   20,
-
   30,
-
   10
-
 );
 
-
-scene.add(
-
-  sun
-
-);
+scene.add(sun);
 
 
-// ==========================
+// ========================================
 // 바닥
-// ==========================
-
+// ========================================
 
 const floor =
-
 new THREE.Mesh(
 
   new THREE.BoxGeometry(
-
     100,
-
     1,
-
     100
-
   ),
 
   new THREE.MeshStandardMaterial({
 
-    color:
-    0x30343c
+    color:0x30343c
 
   })
 
 );
 
+floor.position.y = -0.5;
 
-floor.position.y =
--0.5;
-
-
-scene.add(
-
-  floor
-
-);
+scene.add(floor);
 
 
-// ==========================
-// 조형물
-// ==========================
-
+// ========================================
+// 외벽
+// ========================================
 
 const wallMat =
-
 new THREE.MeshStandardMaterial({
 
-  color:
-  0x555b66
+  color:0x555b66
 
 });
 
 
-function createObstacle(
-
-  obstacle
-
+function createWall(
+  x,
+  z,
+  w,
+  d
 ){
 
-  const mesh =
-
+  const wall =
   new THREE.Mesh(
 
     new THREE.BoxGeometry(
-
-      obstacle.w,
-
-      4,
-
-      obstacle.d
-
+      w,
+      5,
+      d
     ),
 
     wallMat
 
   );
 
-
-  mesh.position.set(
-
-    obstacle.x,
-
-    2,
-
-    obstacle.z
-
+  wall.position.set(
+    x,
+    2.5,
+    z
   );
 
+  wall.userData.mapObject = true;
 
-  scene.add(
-
-    mesh
-
-  );
+  scene.add(wall);
 
 }
 
 
-// ==========================
-// 맵 생성
-// ==========================
+// 외벽
 
+createWall(
+  0,
+  -50,
+  100,
+  2
+);
+
+createWall(
+  0,
+  50,
+  100,
+  2
+);
+
+createWall(
+  -50,
+  0,
+  2,
+  100
+);
+
+createWall(
+  50,
+  0,
+  2,
+  100
+);
+
+
+// ========================================
+// 맵 조형물
+// ========================================
 
 function updateMap(
-
   newObstacles
-
 ){
 
   if(
-
     !Array.isArray(
       newObstacles
     )
-
   ){
 
     return;
@@ -597,34 +442,28 @@ function updateMap(
   newObstacles;
 
 
-  // 기존 조형물 제거
-  // 플레이어와 바닥은 제외
-
+  // 기존 맵 오브젝트 제거
 
   for(
 
     const child
-    of [
-      ...scene.children
-    ]
+    of [...scene.children]
 
   ){
 
     if(
-
-      child.userData
-      .mapObject
-
+      child.userData &&
+      child.userData.mapObject
     ){
 
-      scene.remove(
-        child
-      );
+      scene.remove(child);
 
     }
 
   }
 
+
+  // 서버 맵 생성
 
   for(
 
@@ -634,7 +473,6 @@ function updateMap(
   ){
 
     const mesh =
-
     new THREE.Mesh(
 
       new THREE.BoxGeometry(
@@ -667,32 +505,26 @@ function updateMap(
     true;
 
 
-    scene.add(
-
-      mesh
-
-    );
+    scene.add(mesh);
 
   }
 
 }
 
 
-// ==========================
+// ========================================
 // 충돌 검사
-// ==========================
-
+// ========================================
 
 function blocked(
-
   x,
-
   z
-
 ){
 
-  const radius =
-  0.7;
+  // 충돌 반경 감소
+  // 벽에 너무 일찍 막히는 문제 수정
+
+  const radius = 0.35;
 
 
   for(
@@ -703,49 +535,34 @@ function blocked(
   ){
 
     const minX =
-
     o.x -
-
     o.w / 2 -
-
     radius;
 
 
     const maxX =
-
     o.x +
-
     o.w / 2 +
-
     radius;
 
 
     const minZ =
-
     o.z -
-
     o.d / 2 -
-
     radius;
 
 
     const maxZ =
-
     o.z +
-
     o.d / 2 +
-
     radius;
 
 
     if(
 
       x > minX &&
-
       x < maxX &&
-
       z > minZ &&
-
       z < maxZ
 
     ){
@@ -762,36 +579,29 @@ function blocked(
 }
 
 
-// ==========================
-// 플레이어 만들기
-// ==========================
-
+// ========================================
+// 플레이어 생성
+// ========================================
 
 function makePlayer(
-
   id,
-
   data
-
 ){
 
   const group =
-
   new THREE.Group();
 
 
-  const body =
+  // 몸
 
+  const body =
   new THREE.Mesh(
 
     new THREE.CapsuleGeometry(
 
       0.45,
-
       1,
-
       6,
-
       12
 
     ),
@@ -811,21 +621,52 @@ function makePlayer(
   );
 
 
-  // 발이 바닥에 닿도록
+  // 바닥에 서도록 설정
 
-  body.position.y =
-  1;
+  body.position.y = 1;
 
 
-  group.add(
+  group.add(body);
 
-    body
+
+  // 머리
+
+  const head =
+  new THREE.Mesh(
+
+    new THREE.SphereGeometry(
+      0.38,
+      16,
+      16
+    ),
+
+    new THREE.MeshStandardMaterial({
+
+      color:
+
+      data.it
+
+      ? 0xff7770
+
+      : 0x77c4ff
+
+    })
 
   );
 
 
+  head.position.y = 1.9;
+
+
+  group.add(head);
+
+
   group.userData.player =
   true;
+
+
+  group.userData.id =
+  id;
 
 
   return group;
@@ -833,74 +674,54 @@ function makePlayer(
 }
 
 
-// ==========================
+// ========================================
 // 플레이어 동기화
-// ==========================
-
+// ========================================
 
 function syncPlayers(
-
   data
-
 ){
 
   for(
 
     const [
       id,
-
       p
     ]
 
-    of Object.entries(
-      data
-    )
+    of Object.entries(data)
 
   ){
 
+    // 플레이어가 없으면 생성
+
     if(
-
-      !players.has(
-        id
-      )
-
+      !players.has(id)
     ){
 
       const mesh =
-
       makePlayer(
-
         id,
-
         p
-
       );
 
 
-      scene.add(
-
-        mesh
-
-      );
+      scene.add(mesh);
 
 
       players.set(
-
         id,
-
         mesh
-
       );
 
     }
 
 
     const mesh =
+    players.get(id);
 
-    players.get(
-      id
-    );
 
+    // 위치
 
     mesh.position.set(
 
@@ -913,24 +734,38 @@ function syncPlayers(
     );
 
 
-    mesh.rotation.y =
+    // 회전
 
+    mesh.rotation.y =
     p.rot || 0;
 
 
+    // 색
+
+    const color =
+    p.it
+
+    ? 0xff3b30
+
+    : 0x36a3ff;
+
+
     mesh.children[0]
-
     .material
-
     .color
+    .setHex(color);
 
+
+    mesh.children[1]
+    .material
+    .color
     .setHex(
 
       p.it
 
-      ? 0xff3b30
+      ? 0xff7770
 
-      : 0x36a3ff
+      : 0x77c4ff
 
     );
 
@@ -939,12 +774,10 @@ function syncPlayers(
 
   // 나간 플레이어 제거
 
-
   for(
 
     const [
       id,
-
       mesh
     ]
 
@@ -953,23 +786,12 @@ function syncPlayers(
   ){
 
     if(
-
       !data[id]
-
     ){
 
-      scene.remove(
+      scene.remove(mesh);
 
-        mesh
-
-      );
-
-
-      players.delete(
-
-        id
-
-      );
+      players.delete(id);
 
     }
 
@@ -978,10 +800,9 @@ function syncPlayers(
 }
 
 
-// ==========================
+// ========================================
 // 서버 연결
-// ==========================
-
+// ========================================
 
 socket.on(
 
@@ -990,7 +811,6 @@ socket.on(
   ()=>{
 
     statusEl.textContent =
-
     '서버 연결됨';
 
   }
@@ -998,10 +818,9 @@ socket.on(
 );
 
 
-// ==========================
+// ========================================
 // 방 입장
-// ==========================
-
+// ========================================
 
 socket.on(
 
@@ -1009,13 +828,9 @@ socket.on(
 
   data =>{
 
+    started = true;
 
-    started =
-    true;
-
-
-    myId =
-    data.id;
+    myId = data.id;
 
 
     menu.style.display =
@@ -1023,35 +838,37 @@ socket.on(
 
 
     roomText.textContent =
-
     '방 코드: ' +
-
     data.room;
 
 
-    // 서버에서 받은 맵 사용
-
+    // 서버 맵
 
     if(
-
       data.obstacles
-
     ){
 
       updateMap(
-
         data.obstacles
-
       );
 
     }
 
 
-    // 마우스 잠금
+    // 내 위치를 서버 데이터로 초기화
+
+    if(
+      data.id
+    ){
+
+      local.x = 0;
+
+      local.z = 0;
+
+    }
 
 
     renderer.domElement
-
     .requestPointerLock();
 
   }
@@ -1059,10 +876,9 @@ socket.on(
 );
 
 
-// ==========================
-// 게임 상태
-// ==========================
-
+// ========================================
+// 상태
+// ========================================
 
 socket.on(
 
@@ -1070,27 +886,17 @@ socket.on(
 
   data =>{
 
-
     syncPlayers(
-
       data.players
-
     );
 
 
-    // 서버가 보낸 맵 사용
-
-
     if(
-
       data.obstacles
-
     ){
 
       updateMap(
-
         data.obstacles
-
       );
 
     }
@@ -1109,7 +915,6 @@ socket.on(
       data.chaser
 
       ? '술래: ' +
-
         data.chaser.slice(
           0,
           5
@@ -1124,10 +929,9 @@ socket.on(
 );
 
 
-// ==========================
+// ========================================
 // 오류
-// ==========================
-
+// ========================================
 
 socket.on(
 
@@ -1135,26 +939,20 @@ socket.on(
 
   message =>{
 
-    alert(
-
-      message
-
-    );
+    alert(message);
 
   }
 
 );
 
 
-// ==========================
-// 방 만들기
-// ==========================
-
+// ========================================
+// 방 입장
+// ========================================
 
 playBtn.onclick =
 
 ()=>{
-
 
   socket.emit(
 
@@ -1163,13 +961,11 @@ playBtn.onclick =
     (
 
       roomInput.value ||
-
       ''
 
     )
 
     .trim()
-
     .toUpperCase()
 
   );
@@ -1177,24 +973,19 @@ playBtn.onclick =
 };
 
 
-// ==========================
+// ========================================
 // 키보드
-// ==========================
-
+// ========================================
 
 addEventListener(
 
   'keydown',
 
-  event =>{
+  e =>{
 
     keys[
-
-      event.key.toLowerCase()
-
-    ] =
-
-    true;
+      e.key.toLowerCase()
+    ] = true;
 
   }
 
@@ -1205,33 +996,26 @@ addEventListener(
 
   'keyup',
 
-  event =>{
+  e =>{
 
     keys[
-
-      event.key.toLowerCase()
-
-    ] =
-
-    false;
+      e.key.toLowerCase()
+    ] = false;
 
   }
 
 );
 
 
-// ==========================
-// 마우스 시점
-// ==========================
-
+// ========================================
+// 마우스 카메라
+// ========================================
 
 renderer.domElement.onclick =
 
 ()=>{
 
-
   renderer.domElement
-
   .requestPointerLock();
 
 };
@@ -1241,15 +1025,12 @@ addEventListener(
 
   'mousemove',
 
-  event =>{
-
+  e =>{
 
     if(
 
       document.pointerLockElement
-
       !==
-
       renderer.domElement
 
     ){
@@ -1260,28 +1041,24 @@ addEventListener(
 
 
     yaw -=
-
-    event.movementX *
-
+    e.movementX *
     0.0025;
 
 
     pitch -=
-
-    event.movementY *
-
+    e.movementY *
     0.0025;
 
 
-    pitch =
+    // 카메라가 바닥을 뚫지 않도록
 
-    Math.max(
+    pitch = Math.max(
 
-      -1.2,
+      -0.65,
 
       Math.min(
 
-        1.2,
+        0.65,
 
         pitch
 
@@ -1294,28 +1071,22 @@ addEventListener(
 );
 
 
-// ==========================
+// ========================================
 // 게임 루프
-// ==========================
-
+// ========================================
 
 const clock =
-
 new THREE.Clock();
 
 
 function animate(){
 
-
   requestAnimationFrame(
-
     animate
-
   );
 
 
   const dt =
-
   Math.min(
 
     clock.getDelta(),
@@ -1326,22 +1097,10 @@ function animate(){
 
 
   if(
-
     started
-
   ){
 
-
-    let forward =
-
-    (keys.w ? 1 : 0)
-
-    -
-
-    (keys.s ? 1 : 0);
-
-
-    let right =
+    let x =
 
     (keys.d ? 1 : 0)
 
@@ -1350,99 +1109,72 @@ function animate(){
     (keys.a ? 1 : 0);
 
 
+    let z =
+
+    (keys.s ? 1 : 0)
+
+    -
+
+    (keys.w ? 1 : 0);
+
+
     const length =
 
     Math.hypot(
-
-      forward,
-
-      right
-
+      x,
+      z
     ) || 1;
 
 
-    forward /=
+    x /= length;
 
-    length;
-
-
-    right /=
-
-    length;
+    z /= length;
 
 
-    // 카메라 기준 이동
+    // 기존 A/D 반전 유지
 
 
     const dx =
 
-    Math.sin(
-
-      yaw
-
-    ) *
-
-    forward
+    Math.sin(yaw) *
+    z
 
     +
 
-    Math.cos(
-
-      yaw
-
-    ) *
-
-    right;
+    Math.cos(yaw) *
+    x;
 
 
     const dz =
 
-    Math.cos(
-
-      yaw
-
-    ) *
-
-    forward
+    Math.cos(yaw) *
+    z
 
     -
 
-    Math.sin(
-
-      yaw
-
-    ) *
-
-    right;
+    Math.sin(yaw) *
+    x;
 
 
     const speed =
-
-    7 *
-
-    dt;
+    7 * dt;
 
 
     const nextX =
 
     local.x +
 
-    dx *
-
-    speed;
+    dx * speed;
 
 
     const nextZ =
 
     local.z +
 
-    dz *
-
-    speed;
+    dz * speed;
 
 
     // X축 충돌
-
 
     if(
 
@@ -1477,7 +1209,6 @@ function animate(){
 
     // Z축 충돌
 
-
     if(
 
       !blocked(
@@ -1510,12 +1241,10 @@ function animate(){
 
 
     local.rot =
-
     yaw;
 
 
-    // 서버에 위치 전송
-
+    // 서버 전송
 
     socket.emit(
 
@@ -1526,8 +1255,9 @@ function animate(){
     );
 
 
-    // 카메라 위치
-
+    // ==================================
+    // 카메라
+    // ==================================
 
     const distance =
     7;
@@ -1535,51 +1265,55 @@ function animate(){
 
     const cameraX =
 
-    local.x -
+    local.x
 
-    Math.sin(
+    -
 
-      yaw
+    Math.sin(yaw)
 
-    ) *
+    *
 
-    Math.cos(
+    Math.cos(pitch)
 
-      pitch
-
-    ) *
+    *
 
     distance;
 
+
+    // 바닥 아래로 내려가지 않도록 제한
 
     const cameraY =
 
-    2.5 +
+    Math.max(
 
-    Math.sin(
+      1.4,
 
-      pitch
+      2.5
 
-    ) *
+      +
 
-    distance;
+      Math.sin(pitch)
+
+      *
+
+      distance
+
+    );
 
 
     const cameraZ =
 
-    local.z -
+    local.z
 
-    Math.cos(
+    -
 
-      yaw
+    Math.cos(yaw)
 
-    ) *
+    *
 
-    Math.cos(
+    Math.cos(pitch)
 
-      pitch
-
-    ) *
+    *
 
     distance;
 
@@ -1622,10 +1356,9 @@ function animate(){
 animate();
 
 
-// ==========================
-// 화면 크기 변경
-// ==========================
-
+// ========================================
+// 화면 크기
+// ========================================
 
 addEventListener(
 
@@ -1633,11 +1366,9 @@ addEventListener(
 
   ()=>{
 
-
     camera.aspect =
 
     innerWidth /
-
     innerHeight;
 
 
@@ -1659,5 +1390,4 @@ addEventListener(
 </script>
 
 </body>
-
 </html>
