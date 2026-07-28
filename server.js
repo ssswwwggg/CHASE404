@@ -1,3 +1,4 @@
+```js
 const express = require('express');
 const http = require('http');
 const path = require('path');
@@ -18,17 +19,23 @@ const rooms = new Map();
 const MAX_PLAYERS = 16;
 
 
-// 랜덤 방 코드
+// ======================================
+// 방 코드 생성
+// ======================================
 
 function createRoomCode() {
+
   return Math.random()
     .toString(36)
     .slice(2, 7)
     .toUpperCase();
+
 }
 
 
-// 맵에 사용할 고정 조형물 생성
+// ======================================
+// 맵 생성
+// ======================================
 
 function createMap() {
 
@@ -69,32 +76,30 @@ function createMap() {
 
   const fixedObjects = [
 
-    {x:-30,z:-25,w:5,d:5},
-    {x:-18,z:-12,w:7,d:4},
-    {x:-5,z:-30,w:4,d:7},
-    {x:10,z:-22,w:6,d:6},
+    { x: -30, z: -25, w: 5, d: 5 },
+    { x: -18, z: -12, w: 7, d: 4 },
+    { x: -5, z: -30, w: 4, d: 7 },
+    { x: 10, z: -22, w: 6, d: 6 },
 
-    {x:25,z:-30,w:5,d:5},
-    {x:32,z:-10,w:7,d:4},
+    { x: 25, z: -30, w: 5, d: 5 },
+    { x: 32, z: -10, w: 7, d: 4 },
 
-    {x:-32,z:5,w:5,d:7},
-    {x:-18,z:20,w:6,d:5},
+    { x: -32, z: 5, w: 5, d: 7 },
+    { x: -18, z: 20, w: 6, d: 5 },
 
-    {x:0,z:10,w:5,d:5},
-    {x:12,z:25,w:7,d:4},
+    { x: 0, z: 10, w: 5, d: 5 },
+    { x: 12, z: 25, w: 7, d: 4 },
 
-    {x:28,z:18,w:5,d:6},
-    {x:35,z:35,w:6,d:6},
+    { x: 28, z: 18, w: 5, d: 6 },
+    { x: 35, z: 35, w: 6, d: 6 },
 
-    {x:-30,z:35,w:5,d:5},
-    {x:-8,z:38,w:7,d:4}
+    { x: -30, z: 35, w: 5, d: 5 },
+    { x: -8, z: 38, w: 7, d: 4 }
 
   ];
 
 
-  for(
-    const obj of fixedObjects
-  ){
+  for (const obj of fixedObjects) {
 
     obstacles.push(obj);
 
@@ -102,51 +107,52 @@ function createMap() {
 
 
   return obstacles;
+
 }
 
 
+// ======================================
 // 충돌 검사
+// ======================================
 
 function isBlocked(
   x,
   z,
   obstacles
-){
+) {
 
   const radius = 0.7;
 
 
-  for(
-    const o of obstacles
-  ){
+  for (const o of obstacles) {
 
     const minX =
-    o.x -
-    o.w / 2 -
-    radius;
+      o.x -
+      o.w / 2 -
+      radius;
 
     const maxX =
-    o.x +
-    o.w / 2 +
-    radius;
+      o.x +
+      o.w / 2 +
+      radius;
 
     const minZ =
-    o.z -
-    o.d / 2 -
-    radius;
+      o.z -
+      o.d / 2 -
+      radius;
 
     const maxZ =
-    o.z +
-    o.d / 2 +
-    radius;
+      o.z +
+      o.d / 2 +
+      radius;
 
 
-    if(
+    if (
       x > minX &&
       x < maxX &&
       z > minZ &&
       z < maxZ
-    ){
+    ) {
 
       return true;
 
@@ -160,11 +166,11 @@ function isBlocked(
 }
 
 
-// 플레이어가 이동 가능한 위치로 제한
+// ======================================
+// 위치 제한
+// ======================================
 
-function clampPosition(
-  value
-){
+function clampPosition(value) {
 
   return Math.max(
     -47,
@@ -177,96 +183,194 @@ function clampPosition(
 }
 
 
+// ======================================
+// STATE 전송
+// ======================================
+
+function broadcastState(roomCode) {
+
+  const room =
+    rooms.get(roomCode);
+
+
+  if (!room) {
+
+    console.log(
+      '[CHASE404] STATE 실패: 방 없음',
+      roomCode
+    );
+
+    return;
+
+  }
+
+
+  const playerCount =
+    Object.keys(
+      room.players
+    ).length;
+
+
+  console.log(
+    '[CHASE404] STATE_SENT',
+    'room:',
+    roomCode,
+    'players:',
+    playerCount,
+    'chaser:',
+    room.chaser
+  );
+
+
+  io.to(roomCode).emit(
+    'state',
+    {
+      players: room.players,
+
+      chaser: room.chaser,
+
+      obstacles: room.obstacles
+    }
+  );
+
+}
+
+
+// ======================================
+// Socket.IO
+// ======================================
+
 io.on(
   'connection',
   socket => {
 
 
+    console.log(
+      '[CHASE404] CONNECT',
+      socket.id
+    );
+
+
+    // ==================================
     // 방 참가
+    // ==================================
 
     socket.on(
       'joinRoom',
       requestedRoom => {
 
 
+        console.log(
+          '[CHASE404] JOIN_REQUEST',
+          socket.id,
+          requestedRoom
+        );
+
+
         const roomCode =
-        requestedRoom ||
-        createRoomCode();
+          requestedRoom ||
+          createRoomCode();
 
 
-        if(
+        if (
           !rooms.has(roomCode)
-        ){
+        ) {
 
           rooms.set(
             roomCode,
             {
-              players:{},
-              chaser:null,
-
-              // 방마다 같은 맵 사용
-              obstacles:createMap()
+              players: {},
+              chaser: null,
+              obstacles: createMap()
             }
+          );
+
+
+          console.log(
+            '[CHASE404] ROOM_CREATED',
+            roomCode
           );
 
         }
 
 
         const room =
-        rooms.get(roomCode);
+          rooms.get(roomCode);
 
 
         const playerCount =
-        Object.keys(
-          room.players
-        ).length;
+          Object.keys(
+            room.players
+          ).length;
 
 
-        if(
-          playerCount >= MAX_PLAYERS
-        ){
+        if (
+          playerCount >=
+          MAX_PLAYERS
+        ) {
+
+
+          console.log(
+            '[CHASE404] ROOM_FULL',
+            roomCode
+          );
+
 
           socket.emit(
             'errorMessage',
             '방이 가득 찼습니다.'
           );
 
+
           return;
 
         }
 
 
-        // 플레이어 시작 위치
+        // ==================================
+        // 시작 위치
+        // ==================================
 
         let startX = 0;
+
         let startZ = 0;
 
 
-        // 충돌 없는 위치 찾기
-
-        for(
+        for (
           let i = 0;
           i < 50;
           i++
-        ){
+        ) {
+
 
           const testX =
-          Math.random()*20-10;
+            Math.random() *
+            20 -
+            10;
+
 
           const testZ =
-          Math.random()*20-10;
+            Math.random() *
+            20 -
+            10;
 
 
-          if(
+          if (
             !isBlocked(
               testX,
               testZ,
               room.obstacles
             )
-          ){
+          ) {
 
-            startX = testX;
-            startZ = testZ;
+
+            startX =
+              testX;
+
+
+            startZ =
+              testZ;
+
 
             break;
 
@@ -275,28 +379,53 @@ io.on(
         }
 
 
+        // ==================================
+        // 플레이어 생성
+        // ==================================
+
         room.players[
           socket.id
         ] = {
 
-          x:startX,
-          z:startZ,
+          x: startX,
 
-          rot:0,
+          z: startZ,
 
-          it:false
+          rot: 0,
+
+          it: false
 
         };
 
 
-        // 첫 번째 플레이어가 술래
+        console.log(
+          '[CHASE404] PLAYER_CREATED',
+          socket.id,
+          'room:',
+          roomCode,
+          'x:',
+          startX,
+          'z:',
+          startZ
+        );
 
-        if(
+
+        // ==================================
+        // 첫 번째 플레이어 술래
+        // ==================================
+
+        if (
           !room.chaser
-        ){
+        ) {
 
           room.chaser =
-          socket.id;
+            socket.id;
+
+
+          console.log(
+            '[CHASE404] CHASER_SELECTED',
+            socket.id
+          );
 
         }
 
@@ -307,62 +436,104 @@ io.on(
 
 
         socket.data.room =
-        roomCode;
+          roomCode;
 
 
+        // ==================================
         // 입장 성공
+        // ==================================
 
         socket.emit(
           'joined',
           {
-            id:socket.id,
 
-            room:roomCode,
+            id:
+              socket.id,
 
-            // 같은 맵 전달
-            obstacles:room.obstacles
+            room:
+              roomCode,
+
+            x:
+              room.players[
+                socket.id
+              ].x,
+
+            z:
+              room.players[
+                socket.id
+              ].z,
+
+            rot:
+              room.players[
+                socket.id
+              ].rot,
+
+            player:
+              room.players[
+                socket.id
+              ],
+
+            obstacles:
+              room.obstacles
+
           }
         );
 
 
-        // 모든 플레이어에게 상태 전송
-
-        io.to(
+        console.log(
+          '[CHASE404] JOINED_SENT',
+          socket.id,
           roomCode
-        ).emit(
-          'state',
-          {
-            players:room.players,
+        );
 
-            chaser:room.chaser,
 
-            obstacles:room.obstacles
-          }
+        // ==================================
+        // 모든 플레이어에게 STATE
+        // ==================================
+
+        broadcastState(
+          roomCode
         );
 
       }
     );
 
 
+    // ==================================
     // 이동
+    // ==================================
 
     socket.on(
       'move',
       p => {
 
 
-        const room =
-        rooms.get(
-          socket.data.room
+        console.log(
+          '[CHASE404] MOVE_RECEIVED',
+          socket.id,
+          p
         );
 
 
-        if(
+        const room =
+          rooms.get(
+            socket.data.room
+          );
+
+
+        if (
           !room ||
           !room.players[
             socket.id
           ]
-        ){
+        ) {
+
+
+          console.log(
+            '[CHASE404] MOVE_REJECTED',
+            socket.id
+          );
+
 
           return;
 
@@ -370,107 +541,119 @@ io.on(
 
 
         const me =
-        room.players[
-          socket.id
-        ];
+          room.players[
+            socket.id
+          ];
 
 
         const oldX =
-        me.x;
+          me.x;
+
 
         const oldZ =
-        me.z;
+          me.z;
 
 
         let newX =
-        Number(p.x);
+          Number(
+            p.x
+          );
 
 
         let newZ =
-        Number(p.z);
+          Number(
+            p.z
+          );
 
 
-        if(
+        if (
           !Number.isFinite(
             newX
           )
-        ){
+        ) {
 
           newX =
-          oldX;
+            oldX;
 
         }
 
 
-        if(
+        if (
           !Number.isFinite(
             newZ
           )
-        ){
+        ) {
 
           newZ =
-          oldZ;
+            oldZ;
 
         }
 
 
         newX =
-        clampPosition(
-          newX
-        );
+          clampPosition(
+            newX
+          );
+
 
         newZ =
-        clampPosition(
-          newZ
-        );
+          clampPosition(
+            newZ
+          );
 
 
-        // 서버에서도 충돌 확인
+        // ==================================
+        // X 충돌
+        // ==================================
 
-        // X 이동
-
-        if(
+        if (
           !isBlocked(
             newX,
             oldZ,
             room.obstacles
           )
-        ){
+        ) {
 
           me.x =
-          newX;
+            newX;
 
         }
 
 
-        // Z 이동
+        // ==================================
+        // Z 충돌
+        // ==================================
 
-        if(
+        if (
           !isBlocked(
             me.x,
             newZ,
             room.obstacles
           )
-        ){
+        ) {
 
           me.z =
-          newZ;
+            newZ;
 
         }
 
 
         me.rot =
-        Number(p.rot) || 0;
+          Number(
+            p.rot
+          ) || 0;
 
 
-        // 술래 판정
+        // ==================================
+        // 술래 시스템
+        // ==================================
 
-        if(
+        if (
           me.it
-        ){
+        ) {
 
 
-          for(
+          for (
             const [
               id,
               target
@@ -478,21 +661,22 @@ io.on(
             of Object.entries(
               room.players
             )
-          ){
+          ) {
 
 
-            if(
-              id === socket.id
-            ){
+            if (
+              id ===
+              socket.id
+            ) {
 
               continue;
 
             }
 
 
-            if(
+            if (
               target.it
-            ){
+            ) {
 
               continue;
 
@@ -500,29 +684,37 @@ io.on(
 
 
             const distance =
-            Math.hypot(
-              me.x -
-              target.x,
+              Math.hypot(
+                me.x -
+                  target.x,
 
-              me.z -
-              target.z
-            );
+                me.z -
+                  target.z
+              );
 
 
-            if(
-              distance < 1.7
-            ){
+            if (
+              distance <
+              1.7
+            ) {
 
 
               target.it =
-              true;
+                true;
+
 
               me.it =
-              false;
+                false;
 
 
               room.chaser =
-              id;
+                id;
+
+
+              console.log(
+                '[CHASE404] CHASER_CHANGED',
+                id
+              );
 
 
               break;
@@ -534,41 +726,40 @@ io.on(
         }
 
 
-        // 업데이트
+        // ==================================
+        // STATE 전송
+        // ==================================
 
-        io.to(
+        broadcastState(
           socket.data.room
-        ).emit(
-          'state',
-          {
-            players:room.players,
-
-            chaser:room.chaser,
-
-            obstacles:room.obstacles
-          }
         );
 
       }
     );
 
 
-    // 접속 종료
+    // ==================================
+    // 연결 종료
+    // ==================================
 
     socket.on(
       'disconnect',
       () => {
 
 
-        const room =
-        rooms.get(
-          socket.data.room
+        console.log(
+          '[CHASE404] DISCONNECT',
+          socket.id
         );
 
 
-        if(
-          !room
-        ){
+        const room =
+          rooms.get(
+            socket.data.room
+          );
+
+
+        if (!room) {
 
           return;
 
@@ -580,69 +771,81 @@ io.on(
         ];
 
 
-        // 술래가 나갔다면
-        // 다른 플레이어를 술래로 지정
+        // ==================================
+        // 술래가 나갔을 경우
+        // ==================================
 
-        if(
+        if (
           room.chaser ===
           socket.id
-        ){
+        ) {
 
 
           const ids =
-          Object.keys(
-            room.players
-          );
+            Object.keys(
+              room.players
+            );
 
 
           room.chaser =
-          ids[0] ||
-          null;
+            ids[0] ||
+            null;
 
 
-          if(
+          if (
             room.chaser
-          ){
+          ) {
+
 
             room.players[
               room.chaser
             ].it = true;
+
+
+            console.log(
+              '[CHASE404] NEW_CHASER',
+              room.chaser
+            );
 
           }
 
         }
 
 
-        // 아무도 없으면 방 삭제
+        // ==================================
+        // 방이 비었으면 삭제
+        // ==================================
 
-        if(
+        if (
           Object.keys(
             room.players
-          ).length === 0
-        ){
+          ).length ===
+          0
+        ) {
+
 
           rooms.delete(
             socket.data.room
           );
+
+
+          console.log(
+            '[CHASE404] ROOM_DELETED',
+            socket.data.room
+          );
+
 
           return;
 
         }
 
 
-        // 남은 플레이어에게 알림
+        // ==================================
+        // 남은 플레이어에게 STATE
+        // ==================================
 
-        io.to(
+        broadcastState(
           socket.data.room
-        ).emit(
-          'state',
-          {
-            players:room.players,
-
-            chaser:room.chaser,
-
-            obstacles:room.obstacles
-          }
         );
 
       }
@@ -652,11 +855,13 @@ io.on(
 );
 
 
+// ======================================
 // 서버 시작
+// ======================================
 
 const PORT =
-process.env.PORT ||
-3000;
+  process.env.PORT ||
+  3000;
 
 
 server.listen(
@@ -664,8 +869,11 @@ server.listen(
   () => {
 
     console.log(
-      `CHASE 404 server running on port ${PORT}`
+      `[CHASE404] SERVER_RUNNING`,
+      'port:',
+      PORT
     );
 
   }
 );
+```
