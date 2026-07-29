@@ -1,8 +1,10 @@
 <!doctype html>
+
 <html lang="ko">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+
 <title>CHASE 404</title>
 
 <style>
@@ -12,17 +14,17 @@ html,body{
   overflow:hidden;
   background:#08090c;
   color:#fff;
-  font-family:Arial,sans-serif
+  font-family:Arial,sans-serif;
 }
 
 canvas{
-  display:block
+  display:block;
 }
 
 #ui{
   position:fixed;
   inset:0;
-  pointer-events:none
+  pointer-events:none;
 }
 
 #top{
@@ -31,17 +33,18 @@ canvas{
   left:14px;
   background:#111a;
   padding:10px 14px;
-  border-radius:12px
+  border-radius:12px;
+  z-index:10;
 }
 
 #status{
-  font-weight:bold
+  font-weight:bold;
 }
 
 .small{
   font-size:12px;
   opacity:.7;
-  margin-top:4px
+  margin-top:4px;
 }
 
 #menu{
@@ -51,7 +54,8 @@ canvas{
   display:flex;
   align-items:center;
   justify-content:center;
-  background:radial-gradient(circle,#1c2230,#07080a 65%)
+  background:radial-gradient(circle,#1c2230,#07080a 65%);
+  z-index:20;
 }
 
 .card{
@@ -60,17 +64,17 @@ canvas{
   border:1px solid #ffffff22;
   border-radius:20px;
   background:#1118;
-  text-align:center
+  text-align:center;
 }
 
 h1{
   margin:0 0 8px;
   font-size:42px;
-  letter-spacing:4px
+  letter-spacing:4px;
 }
 
 p{
-  opacity:.75
+  opacity:.75;
 }
 
 input,button{
@@ -82,52 +86,70 @@ input,button{
   border:1px solid #ffffff22;
   background:#0b0d12;
   color:white;
-  font-size:16px
+  font-size:16px;
 }
 
 button{
   cursor:pointer;
   background:#fff;
   color:#111;
-  font-weight:bold
+  font-weight:bold;
 }
 
 #hint{
   font-size:12px;
   opacity:.65;
-  margin-top:10px
+  margin-top:10px;
 }
 </style>
+
 </head>
 
 <body>
 
 <div id="menu">
   <div class="card">
-    <h1>CHASE 404</h1>
-    <p>3D 멀티플레이 술래잡기</p>
 
-    <input
-      id="roomInput"
-      placeholder="방 코드 (비워두면 새 방)"
-      maxlength="12"
-    >
+```
+<h1>CHASE 404</h1>
 
-    <button id="playBtn">
-      게임 시작 / 방 만들기
-    </button>
+<p>3D 멀티플레이 술래잡기</p>
 
-    <div id="hint">
-      WASD 이동 · 마우스 시점 · 클릭으로 시점 잠금
-    </div>
+<input
+  id="roomInput"
+  placeholder="방 코드 (비워두면 새 방)"
+  maxlength="12"
+>
+
+<button id="playBtn">
+  게임 시작 / 방 만들기
+</button>
+
+<div id="hint">
+  WASD 이동 · 마우스 시점 · 클릭으로 시점 잠금
+</div>
+```
+
   </div>
 </div>
 
 <div id="ui">
+
   <div id="top">
-    <div id="status">서버 연결 중...</div>
-    <div class="small" id="roomText"></div>
+
+```
+<div id="status">
+  서버 연결 중...
+</div>
+
+<div
+  class="small"
+  id="roomText"
+></div>
+```
+
   </div>
+
 </div>
 
 <script src="/socket.io/socket.io.js"></script>
@@ -137,617 +159,1393 @@ button{
 import * as THREE from
 'https://cdn.jsdelivr.net/npm/three@0.178.0/build/three.module.js';
 
+
+// ==================================================
+// 기본 설정
+// ==================================================
+
 const socket = io();
 
-const menu = document.querySelector('#menu');
-const playBtn = document.querySelector('#playBtn');
-const roomInput = document.querySelector('#roomInput');
+const menu =
+document.querySelector('#menu');
 
-const statusEl = document.querySelector('#status');
-const roomText = document.querySelector('#roomText');
+const playBtn =
+document.querySelector('#playBtn');
+
+const roomInput =
+document.querySelector('#roomInput');
+
+const statusEl =
+document.querySelector('#status');
+
+const roomText =
+document.querySelector('#roomText');
+
 
 let started = false;
+
 let myId = '';
+
+
+// ==================================================
+// 키보드
+// ==================================================
 
 const keys = {};
 
-const meshes = new Map();
+
+// ==================================================
+// 플레이어 저장
+// ==================================================
+
+const players = new Map();
+
+
+// ==================================================
+// 내 플레이어 위치
+// ==================================================
 
 const local = {
+
   x:0,
+
   z:0,
+
   rot:0
+
 };
 
+
+// ==================================================
+// 카메라
+// ==================================================
+
 let yaw = 0;
+
 let pitch = -0.15;
 
-const scene = new THREE.Scene();
+
+// ==================================================
+// Three.js
+// ==================================================
+
+const scene =
+new THREE.Scene();
 
 scene.background =
-new THREE.Color(0x08090c);
+new THREE.Color(
+  0x08090c
+);
 
 scene.fog =
-new THREE.Fog(0x08090c,35,120);
+new THREE.Fog(
+  0x08090c,
+  35,
+  120
+);
+
 
 const camera =
 new THREE.PerspectiveCamera(
+
   70,
-  innerWidth/innerHeight,
-  .1,
+
+  innerWidth /
+  innerHeight,
+
+  0.1,
+
   300
+
 );
+
 
 const renderer =
 new THREE.WebGLRenderer({
+
   antialias:true
+
 });
 
+
 renderer.setSize(
+
   innerWidth,
+
   innerHeight
+
 );
+
 
 renderer.setPixelRatio(
-  Math.min(devicePixelRatio,2)
-);
 
-document.body.appendChild(
-  renderer.domElement
-);
-
-scene.add(
-  new THREE.HemisphereLight(
-    0xffffff,
-    0x223344,
+  Math.min(
+    devicePixelRatio,
     2
   )
+
 );
+
+
+document.body.appendChild(
+
+  renderer.domElement
+
+);
+
+
+// ==================================================
+// 조명
+// ==================================================
+
+scene.add(
+
+  new THREE.HemisphereLight(
+
+    0xffffff,
+
+    0x223344,
+
+    2
+
+  )
+
+);
+
 
 const sun =
 new THREE.DirectionalLight(
+
   0xffffff,
+
   2
+
 );
 
+
 sun.position.set(
+
   20,
+
   30,
+
   10
+
 );
+
 
 scene.add(sun);
 
 
+// ==================================================
 // 바닥
+// ==================================================
 
 const floor =
 new THREE.Mesh(
+
   new THREE.BoxGeometry(
+
     100,
+
     1,
+
     100
+
   ),
+
   new THREE.MeshStandardMaterial({
+
     color:0x30343c
+
   })
+
 );
 
+
 floor.position.y = -0.5;
+
 
 scene.add(floor);
 
 
-// 벽
+// ==================================================
+// 서버 맵 충돌 데이터
+// ==================================================
 
-const wallMat =
-new THREE.MeshStandardMaterial({
-  color:0x555b66
-});
-
-const obstacles = [];
-
-function wall(x,z,w,d){
-
-  const m =
-  new THREE.Mesh(
-    new THREE.BoxGeometry(
-      w,
-      5,
-      d
-    ),
-    wallMat
-  );
-
-  m.position.set(
-    x,
-    2.5,
-    z
-  );
-
-  scene.add(m);
-
-  obstacles.push({
-    x,
-    z,
-    w,
-    d
-  });
-}
-
-wall(0,-50,100,2);
-wall(0,50,100,2);
-wall(-50,0,2,100);
-wall(50,0,2,100);
+let obstacles = [];
 
 
-// 조형물
+// ==================================================
+// 맵 오브젝트 저장
+// ==================================================
 
-for(let i=0;i<14;i++){
+const mapMeshes = [];
 
-  const w =
-  3 + Math.random()*4;
 
-  const h =
-  2 + Math.random()*4;
+// ==================================================
+// 맵 초기화
+// ==================================================
 
-  const d =
-  3 + Math.random()*4;
+function clearMap(){
 
-  const x =
-  Math.random()*80-40;
+  for(
 
-  const z =
-  Math.random()*80-40;
+    const mesh
 
-  const b =
-  new THREE.Mesh(
-    new THREE.BoxGeometry(
-      w,
-      h,
-      d
-    ),
-    wallMat
-  );
+    of mapMeshes
 
-  b.position.set(
-    x,
-    h/2,
-    z
-  );
+  ){
 
-  scene.add(b);
+    scene.remove(mesh);
 
-  obstacles.push({
-    x,
-    z,
-    w,
-    d
-  });
+  }
+
+  mapMeshes.length = 0;
+
+  obstacles = [];
+
 }
 
 
+// ==================================================
+// 서버 맵 생성
+// ==================================================
+
+function buildMap(serverObstacles){
+
+  clearMap();
+
+
+  if(
+
+    !Array.isArray(
+      serverObstacles
+    )
+
+  ){
+
+    console.warn(
+      '서버 맵 데이터 없음'
+    );
+
+    return;
+
+  }
+
+
+  const wallMat =
+  new THREE.MeshStandardMaterial({
+
+    color:0x555b66
+
+  });
+
+
+  for(
+
+    const o
+
+    of serverObstacles
+
+  ){
+
+    obstacles.push({
+
+      x:o.x,
+
+      z:o.z,
+
+      w:o.w,
+
+      d:o.d
+
+    });
+
+
+    const mesh =
+    new THREE.Mesh(
+
+      new THREE.BoxGeometry(
+
+        o.w,
+
+        5,
+
+        o.d
+
+      ),
+
+      wallMat
+
+    );
+
+
+    mesh.position.set(
+
+      o.x,
+
+      2.5,
+
+      o.z
+
+    );
+
+
+    scene.add(mesh);
+
+    mapMeshes.push(mesh);
+
+  }
+
+}
+
+
+// ==================================================
 // 충돌 검사
+// ==================================================
 
-function blocked(x,z){
+function blocked(
+
+  x,
+
+  z
+
+){
 
   const radius = 0.7;
 
-  for(const o of obstacles){
+
+  for(
+
+    const o
+
+    of obstacles
+
+  ){
 
     const minX =
-    o.x - o.w/2 - radius;
+
+    o.x -
+
+    o.w / 2 -
+
+    radius;
+
 
     const maxX =
-    o.x + o.w/2 + radius;
+
+    o.x +
+
+    o.w / 2 +
+
+    radius;
+
 
     const minZ =
-    o.z - o.d/2 - radius;
+
+    o.z -
+
+    o.d / 2 -
+
+    radius;
+
 
     const maxZ =
-    o.z + o.d/2 + radius;
+
+    o.z +
+
+    o.d / 2 +
+
+    radius;
+
 
     if(
+
       x > minX &&
+
       x < maxX &&
+
       z > minZ &&
+
       z < maxZ
+
     ){
+
       return true;
+
     }
+
   }
 
+
   return false;
+
 }
 
 
-// 플레이어
+// ==================================================
+// 플레이어 생성
+// ==================================================
 
-function makePlayer(id,p){
+function makePlayer(
 
-  const g =
+  id,
+
+  p
+
+){
+
+  const group =
   new THREE.Group();
+
+
+  // 몸통
 
   const body =
   new THREE.Mesh(
+
     new THREE.CapsuleGeometry(
-      .45,
+
+      0.45,
+
       1,
+
       6,
+
       12
+
     ),
+
     new THREE.MeshStandardMaterial({
+
       color:
+
       p.it
+
       ? 0xff3b30
+
       : 0x36a3ff
+
     })
+
   );
 
-  // 바닥에 제대로 서도록 수정
+
   body.position.y = 1;
 
-  g.add(body);
 
-  return g;
-}
+  group.add(body);
 
 
-// 플레이어 동기화
+  // 머리 위 표시
 
-function sync(data){
+  const marker =
+  new THREE.Mesh(
 
-  for(
-    const [id,p]
-    of Object.entries(data)
-  ){
+    new THREE.SphereGeometry(
 
-    if(!meshes.has(id)){
+      0.15,
 
-      const m =
-      makePlayer(id,p);
+      12,
 
-      scene.add(m);
+      12
 
-      meshes.set(id,m);
-    }
+    ),
 
-    const m =
-    meshes.get(id);
+    new THREE.MeshStandardMaterial({
 
-    // 플레이어는 바닥 y=0
-    m.position.set(
-      p.x,
-      0,
-      p.z
-    );
+      color:
 
-    m.rotation.y =
-    p.rot || 0;
-
-    m.children[0]
-    .material
-    .color
-    .setHex(
       p.it
-      ? 0xff3b30
-      : 0x36a3ff
-    );
-  }
 
-  for(
-    const [id,m]
-    of meshes
+      ? 0xff3b30
+
+      : 0xffffff
+
+    })
+
+  );
+
+
+  marker.position.y = 2.1;
+
+
+  group.add(marker);
+
+
+  // 내 캐릭터 표시
+
+  if(
+
+    id === myId
+
   ){
 
-    if(!data[id]){
+    group.scale.set(
 
-      scene.remove(m);
+      1.1,
 
-      meshes.delete(id);
-    }
+      1.1,
+
+      1.1
+
+    );
+
   }
+
+
+  scene.add(group);
+
+
+  return group;
+
 }
 
 
+// ==================================================
+// 플레이어 상태 동기화
+// ==================================================
+
+function syncPlayers(
+
+  data
+
+){
+
+  if(!data){
+
+    return;
+
+  }
+
+
+  const activeIds =
+  new Set();
+
+
+  for(
+
+    const [
+
+      id,
+
+      p
+
+    ]
+
+    of Object.entries(data)
+
+  ){
+
+    activeIds.add(id);
+
+
+    // 새 플레이어 생성
+
+    if(
+
+      !players.has(id)
+
+    ){
+
+      const mesh =
+
+      makePlayer(
+
+        id,
+
+        p
+
+      );
+
+
+      players.set(
+
+        id,
+
+        mesh
+
+      );
+
+    }
+
+
+    const mesh =
+
+    players.get(id);
+
+
+    // 서버 위치 적용
+
+    mesh.position.x =
+
+    Number(p.x) || 0;
+
+
+    mesh.position.y =
+
+    0;
+
+
+    mesh.position.z =
+
+    Number(p.z) || 0;
+
+
+    mesh.rotation.y =
+
+    Number(p.rot) || 0;
+
+
+    // 술래 색상 변경
+
+    const body =
+
+    mesh.children[0];
+
+
+    if(
+
+      body &&
+
+      body.material
+
+    ){
+
+      body.material.color.setHex(
+
+        p.it
+
+        ? 0xff3b30
+
+        : 0x36a3ff
+
+      );
+
+    }
+
+
+    // 머리 위 표시 색상
+
+    const marker =
+
+    mesh.children[1];
+
+
+    if(
+
+      marker &&
+
+      marker.material
+
+    ){
+
+      marker.material.color.setHex(
+
+        p.it
+
+        ? 0xff3b30
+
+        : 0xffffff
+
+      );
+
+    }
+
+
+    // 내 위치도 서버 기준으로 보정
+
+    if(
+
+      id === myId
+
+    ){
+
+      local.x =
+
+      Number(p.x) || 0;
+
+
+      local.z =
+
+      Number(p.z) || 0;
+
+
+      local.rot =
+
+      Number(p.rot) || 0;
+
+    }
+
+  }
+
+
+  // 나간 플레이어 제거
+
+  for(
+
+    const [
+
+      id,
+
+      mesh
+
+    ]
+
+    of players
+
+  ){
+
+    if(
+
+      !activeIds.has(id)
+
+    ){
+
+      scene.remove(mesh);
+
+      players.delete(id);
+
+    }
+
+  }
+
+}
+
+
+// ==================================================
 // 서버 연결
+// ==================================================
 
 socket.on(
+
   'connect',
+
   ()=>{
+
     statusEl.textContent =
+
     '서버 연결됨';
+
   }
+
 );
 
 
-// 입장
+// ==================================================
+// 서버 연결 끊김
+// ==================================================
 
 socket.on(
+
+  'disconnect',
+
+  ()=>{
+
+    statusEl.textContent =
+
+    '서버 연결 끊김';
+
+  }
+
+);
+
+
+// ==================================================
+// 방 입장 완료
+// ==================================================
+
+socket.on(
+
   'joined',
+
   d=>{
 
     started = true;
 
+
     myId = d.id;
 
+
     menu.style.display =
+
     'none';
 
+
     roomText.textContent =
-    '방 코드: '+d.room;
+
+    '방 코드: ' +
+
+    d.room;
+
+
+    // 서버 맵 사용
+
+    buildMap(
+
+      d.obstacles
+
+    );
+
 
     renderer.domElement
+
     .requestPointerLock();
+
   }
+
 );
 
 
-// 상태
+// ==================================================
+// 서버 상태 수신
+// ==================================================
 
 socket.on(
+
   'state',
+
   d=>{
 
-    sync(d.players);
+    // 서버 맵이 변경되었으면 갱신
+
+    if(
+
+      d.obstacles
+
+    ){
+
+      buildMap(
+
+        d.obstacles
+
+      );
+
+    }
+
+
+    // 플레이어 동기화
+
+    syncPlayers(
+
+      d.players
+
+    );
+
+
+    const count =
+
+    Object.keys(
+
+      d.players || {}
+
+    ).length;
+
 
     statusEl.textContent =
-    `접속자 ${
-      Object.keys(d.players).length
-    }명 · ${
+
+    `접속자 ${count}명 · ` +
+
+    (
+
       d.chaser
-      ? '술래: '+d.chaser.slice(0,5)
+
+      ? '술래: ' +
+
+        d.chaser.slice(
+
+          0,
+
+          5
+
+        )
+
       : '술래 선정 중'
-    }`;
+
+    );
+
   }
+
 );
 
 
-// 오류
+// ==================================================
+// 서버 오류
+// ==================================================
 
 socket.on(
+
   'errorMessage',
-  m=>{
-    alert(m);
+
+  message=>{
+
+    alert(message);
+
   }
+
 );
 
 
-// 방 입장
+// ==================================================
+// 방 참가
+// ==================================================
 
 playBtn.onclick =
+
 ()=>{
 
+  const room =
+
+  (
+
+    roomInput.value || ''
+
+  )
+
+  .trim()
+
+  .toUpperCase();
+
+
   socket.emit(
+
     'joinRoom',
-    (roomInput.value||'')
-    .trim()
-    .toUpperCase()
+
+    room
+
   );
+
 };
 
 
+// ==================================================
 // 키보드
+// ==================================================
 
 addEventListener(
+
   'keydown',
+
   e=>{
+
     keys[
+
       e.key.toLowerCase()
+
     ] = true;
+
   }
+
 );
+
 
 addEventListener(
+
   'keyup',
+
   e=>{
+
     keys[
+
       e.key.toLowerCase()
+
     ] = false;
+
   }
+
 );
 
 
+// ==================================================
 // 마우스 시점
+// ==================================================
 
 renderer.domElement.onclick =
+
 ()=>{
 
   renderer.domElement
+
   .requestPointerLock();
+
 };
 
 
 addEventListener(
+
   'mousemove',
+
   e=>{
 
     if(
-      document.pointerLockElement
-      !== renderer.domElement
+
+      document.pointerLockElement !==
+
+      renderer.domElement
+
     ){
+
       return;
+
     }
 
+
     yaw -=
-    e.movementX * 0.0025;
+
+    e.movementX *
+
+    0.0025;
+
 
     pitch -=
-    e.movementY * 0.0025;
+
+    e.movementY *
+
+    0.0025;
+
 
     pitch =
+
     Math.max(
+
       -1.2,
+
       Math.min(
+
         1.2,
+
         pitch
+
       )
+
     );
+
   }
+
 );
 
 
+// ==================================================
 // 게임 루프
+// ==================================================
 
 const clock =
+
 new THREE.Clock();
+
 
 function animate(){
 
   requestAnimationFrame(
+
     animate
+
   );
 
+
   const dt =
+
   Math.min(
+
     clock.getDelta(),
-    .05
+
+    0.05
+
   );
+
 
   if(started){
 
     let forward =
-    (keys.w?1:0) -
-    (keys.s?1:0);
+
+    (
+
+      keys.w ? 1 : 0
+
+    ) -
+
+    (
+
+      keys.s ? 1 : 0
+
+    );
+
 
     let right =
-    (keys.d?1:0) -
-    (keys.a?1:0);
+
+    (
+
+      keys.d ? 1 : 0
+
+    ) -
+
+    (
+
+      keys.a ? 1 : 0
+
+    );
+
 
     const len =
+
     Math.hypot(
+
       forward,
+
       right
+
     ) || 1;
 
+
     forward /= len;
+
     right /= len;
 
 
-    // 카메라 방향 기준 이동
+    // 카메라 기준 이동
 
     const dx =
-    Math.sin(yaw) * forward +
-    Math.cos(yaw) * right;
+
+    Math.sin(yaw) *
+
+    forward +
+
+    Math.cos(yaw) *
+
+    right;
+
 
     const dz =
-    Math.cos(yaw) * forward -
-    Math.sin(yaw) * right;
+
+    Math.cos(yaw) *
+
+    forward -
+
+    Math.sin(yaw) *
+
+    right;
 
 
     const speed =
+
     7 * dt;
 
 
     const nextX =
-    local.x + dx * speed;
+
+    local.x +
+
+    dx *
+
+    speed;
+
 
     const nextZ =
-    local.z + dz * speed;
+
+    local.z +
+
+    dz *
+
+    speed;
 
 
-    // X축 충돌 검사
+    // X축 이동
 
-    if(!blocked(nextX,local.z)){
+    if(
+
+      !blocked(
+
+        nextX,
+
+        local.z
+
+      )
+
+    ){
 
       local.x =
+
       Math.max(
+
         -47,
+
         Math.min(
+
           47,
+
           nextX
+
         )
+
       );
+
     }
 
 
-    // Z축 충돌 검사
+    // Z축 이동
 
-    if(!blocked(local.x,nextZ)){
+    if(
+
+      !blocked(
+
+        local.x,
+
+        nextZ
+
+      )
+
+    ){
 
       local.z =
+
       Math.max(
+
         -47,
+
         Math.min(
+
           47,
+
           nextZ
+
         )
+
       );
+
     }
 
 
     local.rot =
+
     yaw;
 
 
+    // 서버에 내 위치 전송
+
     socket.emit(
+
       'move',
-      local
+
+      {
+
+        x:local.x,
+
+        z:local.z,
+
+        rot:local.rot
+
+      }
+
     );
 
 
     // 카메라
 
-    const distance = 7;
+    const distance =
+
+    7;
+
 
     const camX =
+
     local.x -
+
     Math.sin(yaw) *
+
     Math.cos(pitch) *
+
     distance;
+
 
     const camY =
+
     2.5 +
+
     Math.sin(pitch) *
+
     distance;
 
+
     const camZ =
+
     local.z -
+
     Math.cos(yaw) *
+
     Math.cos(pitch) *
+
     distance;
 
 
     camera.position.set(
+
       camX,
+
       camY,
+
       camZ
+
     );
 
 
     camera.lookAt(
+
       local.x,
+
       1.2,
+
       local.z
+
     );
+
   }
 
 
   renderer.render(
+
     scene,
+
     camera
+
   );
+
 }
 
 
 animate();
 
 
+// ==================================================
+// 화면 크기 변경
+// ==================================================
+
 addEventListener(
+
   'resize',
+
   ()=>{
 
     camera.aspect =
+
     innerWidth /
+
     innerHeight;
+
 
     camera.updateProjectionMatrix();
 
+
     renderer.setSize(
+
       innerWidth,
+
       innerHeight
+
     );
+
   }
+
 );
 
 </script>
