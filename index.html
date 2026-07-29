@@ -1,0 +1,1199 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CHASE 404</title>
+
+<style>
+html,body{
+  margin:0;
+  width:100%;
+  height:100%;
+  overflow:hidden;
+  background:#08090c;
+  color:#fff;
+  font-family:Arial,sans-serif;
+}
+
+canvas{
+  display:block;
+}
+
+#ui{
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+}
+
+#top{
+  position:absolute;
+  top:14px;
+  left:14px;
+  background:rgba(10,12,18,.85);
+  padding:12px 15px;
+  border-radius:12px;
+  border:1px solid #ffffff22;
+  min-width:190px;
+}
+
+#status{
+  font-weight:bold;
+}
+
+.small{
+  font-size:12px;
+  opacity:.8;
+  margin-top:5px;
+}
+
+#debug{
+  margin-top:6px;
+  font-size:11px;
+  color:#9ee7ff;
+}
+
+#menu{
+  pointer-events:auto;
+  position:absolute;
+  inset:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:radial-gradient(circle,#1c2230,#07080a 65%);
+  z-index:10;
+}
+
+.card{
+  width:min(420px,calc(100% - 40px));
+  padding:28px;
+  border:1px solid #ffffff22;
+  border-radius:20px;
+  background:#111c;
+  text-align:center;
+  box-sizing:border-box;
+}
+
+h1{
+  margin:0 0 8px;
+  font-size:42px;
+  letter-spacing:4px;
+}
+
+p{
+  opacity:.75;
+}
+
+input,button{
+  width:100%;
+  box-sizing:border-box;
+  padding:13px;
+  margin-top:10px;
+  border-radius:10px;
+  border:1px solid #ffffff22;
+  background:#0b0d12;
+  color:white;
+  font-size:16px;
+}
+
+button{
+  cursor:pointer;
+  background:#fff;
+  color:#111;
+  font-weight:bold;
+}
+
+#hint{
+  font-size:12px;
+  opacity:.65;
+  margin-top:10px;
+}
+</style>
+</head>
+
+<body>
+
+<div id="menu">
+  <div class="card">
+    <h1>CHASE 404</h1>
+    <p>3D 멀티플레이 술래잡기</p>
+
+    <input
+      id="roomInput"
+      placeholder="방 코드 (비워두면 새 방)"
+      maxlength="12"
+    >
+
+    <button id="playBtn">
+      게임 시작 / 방 만들기
+    </button>
+
+    <div id="hint">
+      WASD 이동 · 마우스 시점 · 클릭으로 시점 잠금
+    </div>
+  </div>
+</div>
+
+<div id="ui">
+
+  <div id="top">
+
+    <div id="status">
+      서버 연결 중...
+    </div>
+
+    <div class="small" id="roomText">
+    </div>
+
+    <div id="debug">
+      플레이어: 0명<br>
+      장애물: 0개<br>
+      내 캐릭터: 확인 중
+    </div>
+
+  </div>
+
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+
+<script type="module">
+
+import * as THREE from
+"https://cdn.jsdelivr.net/npm/three@0.178.0/build/three.module.js";
+
+
+/* =========================
+   기본 설정
+========================= */
+
+const socket = io();
+
+const menu =
+document.querySelector("#menu");
+
+const playBtn =
+document.querySelector("#playBtn");
+
+const roomInput =
+document.querySelector("#roomInput");
+
+const statusEl =
+document.querySelector("#status");
+
+const roomText =
+document.querySelector("#roomText");
+
+const debugEl =
+document.querySelector("#debug");
+
+
+let started = false;
+
+let myId = "";
+
+let yaw = 0;
+
+let pitch = -0.15;
+
+
+const keys = {};
+
+const players = new Map();
+
+const obstacleMeshes = [];
+
+
+const local = {
+  x:0,
+  z:0,
+  rot:0
+};
+
+
+let obstacles = [];
+
+
+/* =========================
+   THREE 기본 설정
+========================= */
+
+const scene =
+new THREE.Scene();
+
+scene.background =
+new THREE.Color(0x08090c);
+
+scene.fog =
+new THREE.Fog(
+  0x08090c,
+  35,
+  120
+);
+
+
+const camera =
+new THREE.PerspectiveCamera(
+  70,
+  innerWidth / innerHeight,
+  0.1,
+  300
+);
+
+
+const renderer =
+new THREE.WebGLRenderer({
+  antialias:true
+});
+
+
+renderer.setSize(
+  innerWidth,
+  innerHeight
+);
+
+renderer.setPixelRatio(
+  Math.min(devicePixelRatio,2)
+);
+
+document.body.appendChild(
+  renderer.domElement
+);
+
+
+/* =========================
+   조명
+========================= */
+
+scene.add(
+  new THREE.HemisphereLight(
+    0xffffff,
+    0x223344,
+    2
+  )
+);
+
+
+const sun =
+new THREE.DirectionalLight(
+  0xffffff,
+  2
+);
+
+sun.position.set(
+  20,
+  30,
+  10
+);
+
+scene.add(sun);
+
+
+/* =========================
+   바닥
+========================= */
+
+const floor =
+new THREE.Mesh(
+  new THREE.BoxGeometry(
+    100,
+    1,
+    100
+  ),
+  new THREE.MeshStandardMaterial({
+    color:0x30343c
+  })
+);
+
+floor.position.y = -0.5;
+
+scene.add(floor);
+
+
+/* =========================
+   벽 재질
+========================= */
+
+const wallMat =
+new THREE.MeshStandardMaterial({
+  color:0x555b66
+});
+
+
+/* =========================
+   장애물 제거
+========================= */
+
+function clearObstacles(){
+
+  for(
+    const mesh of obstacleMeshes
+  ){
+
+    scene.remove(mesh);
+
+    mesh.geometry.dispose();
+
+  }
+
+  obstacleMeshes.length = 0;
+
+}
+
+
+/* =========================
+   서버 맵 생성
+========================= */
+
+function createServerMap(
+  mapData
+){
+
+  clearObstacles();
+
+  for(
+    const o of mapData || []
+  ){
+
+    const isOuterWall =
+      o.w >= 90 ||
+      o.d >= 90;
+
+    const height =
+      isOuterWall
+      ? 5
+      : 3 + (
+          (o.w + o.d) % 3
+        );
+
+
+    const mesh =
+    new THREE.Mesh(
+
+      new THREE.BoxGeometry(
+        o.w,
+        height,
+        o.d
+      ),
+
+      new THREE.MeshStandardMaterial({
+        color:
+          isOuterWall
+          ? 0x20252e
+          : 0x555b66
+      })
+
+    );
+
+
+    mesh.position.set(
+      o.x,
+      height / 2,
+      o.z
+    );
+
+
+    scene.add(mesh);
+
+    obstacleMeshes.push(mesh);
+
+  }
+
+}
+
+
+/* =========================
+   충돌 판정
+========================= */
+
+function blocked(
+  x,
+  z
+){
+
+  const radius = 0.7;
+
+
+  return obstacles.some(
+    o => {
+
+      const minX =
+        o.x -
+        o.w / 2 -
+        radius;
+
+      const maxX =
+        o.x +
+        o.w / 2 +
+        radius;
+
+      const minZ =
+        o.z -
+        o.d / 2 -
+        radius;
+
+      const maxZ =
+        o.z +
+        o.d / 2 +
+        radius;
+
+
+      return (
+        x > minX &&
+        x < maxX &&
+        z > minZ &&
+        z < maxZ
+      );
+
+    }
+  );
+
+}
+
+
+/* =========================
+   플레이어 생성
+========================= */
+
+function makePlayer(
+  isIt
+){
+
+  const group =
+  new THREE.Group();
+
+
+  const body =
+  new THREE.Mesh(
+
+    new THREE.CapsuleGeometry(
+      0.45,
+      1,
+      6,
+      12
+    ),
+
+    new THREE.MeshStandardMaterial({
+
+      color:
+        isIt
+        ? 0xff3b30
+        : 0x36a3ff
+
+    })
+
+  );
+
+
+  body.position.y = 1;
+
+
+  group.add(body);
+
+
+  const marker =
+  new THREE.Mesh(
+
+    new THREE.SphereGeometry(
+      0.12,
+      12,
+      12
+    ),
+
+    new THREE.MeshStandardMaterial({
+
+      color:0xffffff,
+
+      emissive:0xffffff,
+
+      emissiveIntensity:2
+
+    })
+
+  );
+
+
+  marker.position.y = 2.05;
+
+
+  group.add(marker);
+
+
+  return group;
+
+}
+
+
+/* =========================
+   플레이어 동기화
+========================= */
+
+function syncPlayers(
+  data
+){
+
+  const seen =
+  new Set();
+
+
+  for(
+    const [id,p]
+    of Object.entries(
+      data || {}
+    )
+  ){
+
+    seen.add(id);
+
+
+    if(
+      !players.has(id)
+    ){
+
+      const mesh =
+      makePlayer(
+        Boolean(p.it)
+      );
+
+      scene.add(mesh);
+
+      players.set(
+        id,
+        mesh
+      );
+
+    }
+
+
+    const mesh =
+    players.get(id);
+
+
+    mesh.position.set(
+      Number(p.x) || 0,
+      0,
+      Number(p.z) || 0
+    );
+
+
+    mesh.rotation.y =
+      Number(p.rot) || 0;
+
+
+    const material =
+      mesh.children[0].material;
+
+
+    material.color.setHex(
+
+      p.it
+      ? 0xff3b30
+      : 0x36a3ff
+
+    );
+
+  }
+
+
+  for(
+    const [id,mesh]
+    of players
+  ){
+
+    if(
+      !seen.has(id)
+    ){
+
+      scene.remove(mesh);
+
+      mesh.traverse(
+        obj => {
+
+          if(
+            obj.geometry
+          ){
+
+            obj.geometry.dispose();
+
+          }
+
+          if(
+            obj.material
+          ){
+
+            obj.material.dispose();
+
+          }
+
+        }
+      );
+
+      players.delete(id);
+
+    }
+
+  }
+
+
+  const me =
+  data?.[myId];
+
+
+  if(me){
+
+    local.x =
+      Number(me.x) || 0;
+
+    local.z =
+      Number(me.z) || 0;
+
+  }
+
+
+  updateDebug();
+
+}
+
+
+/* =========================
+   디버그 UI
+========================= */
+
+function updateDebug(){
+
+  debugEl.innerHTML =
+
+    `플레이어: ${players.size}명<br>` +
+
+    `장애물: ${obstacles.length}개<br>` +
+
+    `내 캐릭터: ${
+      players.has(myId)
+      ? "정상"
+      : "없음"
+    }`;
+
+}
+
+
+/* =========================
+   서버 연결
+========================= */
+
+socket.on(
+  "connect",
+  () => {
+
+    statusEl.textContent =
+      "서버 연결됨";
+
+  }
+);
+
+
+/* =========================
+   방 입장
+========================= */
+
+socket.on(
+  "joined",
+  data => {
+
+    started = true;
+
+    myId =
+      data.id;
+
+
+    menu.style.display =
+      "none";
+
+
+    roomText.textContent =
+      "방 코드: " +
+      data.room;
+
+
+    obstacles =
+      data.obstacles || [];
+
+
+    createServerMap(
+      obstacles
+    );
+
+
+    updateDebug();
+
+
+    renderer.domElement
+      .requestPointerLock();
+
+  }
+);
+
+
+/* =========================
+   서버 상태
+========================= */
+
+socket.on(
+  "state",
+  data => {
+
+    if(
+      data.obstacles
+    ){
+
+      obstacles =
+        data.obstacles;
+
+      createServerMap(
+        obstacles
+      );
+
+    }
+
+
+    syncPlayers(
+      data.players
+    );
+
+
+    const count =
+      Object.keys(
+        data.players || {}
+      ).length;
+
+
+    statusEl.textContent =
+
+      `접속자 ${count}명 · ` +
+
+      (
+        data.chaser
+        ? "술래: " +
+          data.chaser.slice(0,5)
+        : "술래 선정 중"
+      );
+
+  }
+);
+
+
+/* =========================
+   서버 오류
+========================= */
+
+socket.on(
+  "errorMessage",
+  message => {
+
+    alert(message);
+
+  }
+);
+
+
+/* =========================
+   게임 시작
+========================= */
+
+playBtn.onclick =
+() => {
+
+  socket.emit(
+    "joinRoom",
+
+    roomInput.value
+      .trim()
+      .toUpperCase()
+
+  );
+
+};
+
+
+roomInput.addEventListener(
+  "keydown",
+  e => {
+
+    if(
+      e.key === "Enter"
+    ){
+
+      playBtn.click();
+
+    }
+
+  }
+);
+
+
+/* =========================
+   키보드
+========================= */
+
+addEventListener(
+  "keydown",
+  e => {
+
+    keys[
+      e.key.toLowerCase()
+    ] = true;
+
+  }
+);
+
+
+addEventListener(
+  "keyup",
+  e => {
+
+    keys[
+      e.key.toLowerCase()
+    ] = false;
+
+  }
+);
+
+
+/* =========================
+   마우스 시점
+========================= */
+
+renderer.domElement.addEventListener(
+  "click",
+  () => {
+
+    renderer.domElement
+      .requestPointerLock();
+
+  }
+);
+
+
+addEventListener(
+  "mousemove",
+  e => {
+
+    if(
+      document.pointerLockElement
+      !== renderer.domElement
+    ){
+
+      return;
+
+    }
+
+
+    yaw -=
+      e.movementX *
+      0.0025;
+
+
+    pitch -=
+      e.movementY *
+      0.0025;
+
+
+    pitch =
+      Math.max(
+        -0.7,
+        Math.min(
+          0.7,
+          pitch
+        )
+      );
+
+  }
+);
+
+
+/* =========================
+   카메라 충돌
+========================= */
+
+function updateCamera(){
+
+  const distance = 7;
+
+
+  const target =
+  new THREE.Vector3(
+    local.x,
+    1.2,
+    local.z
+  );
+
+
+  const direction =
+  new THREE.Vector3(
+
+    -Math.sin(yaw) *
+      Math.cos(pitch),
+
+    Math.sin(pitch),
+
+    -Math.cos(yaw) *
+      Math.cos(pitch)
+
+  ).normalize();
+
+
+  let cameraDistance =
+    distance;
+
+
+  const steps = 20;
+
+
+  for(
+    let i = 1;
+    i <= steps;
+    i++
+  ){
+
+    const d =
+      distance *
+      i /
+      steps;
+
+
+    const testX =
+      local.x +
+      direction.x *
+      d;
+
+
+    const testZ =
+      local.z +
+      direction.z *
+      d;
+
+
+    if(
+      blocked(
+        testX,
+        testZ
+      )
+    ){
+
+      cameraDistance =
+        Math.max(
+          1.2,
+          d - 0.5
+        );
+
+      break;
+
+    }
+
+  }
+
+
+  camera.position.set(
+
+    local.x +
+      direction.x *
+      cameraDistance,
+
+    Math.max(
+      0.8,
+      local.y ||
+      1.2 +
+      direction.y *
+      cameraDistance
+    ),
+
+    local.z +
+      direction.z *
+      cameraDistance
+
+  );
+
+
+  camera.lookAt(
+    target
+  );
+
+}
+
+
+/* =========================
+   게임 루프
+========================= */
+
+const clock =
+new THREE.Clock();
+
+
+function animate(){
+
+  requestAnimationFrame(
+    animate
+  );
+
+
+  const dt =
+    Math.min(
+      clock.getDelta(),
+      0.05
+    );
+
+
+  if(
+    started
+  ){
+
+    let forward =
+      (keys.w ? 1 : 0) -
+      (keys.s ? 1 : 0);
+
+
+    let right =
+      (keys.d ? 1 : 0) -
+      (keys.a ? 1 : 0);
+
+
+    const len =
+      Math.hypot(
+        forward,
+        right
+      ) || 1;
+
+
+    forward /=
+      len;
+
+
+    right /=
+      len;
+
+
+    const dx =
+
+      Math.sin(yaw) *
+        forward +
+
+      Math.cos(yaw) *
+        right;
+
+
+    const dz =
+
+      Math.cos(yaw) *
+        forward -
+
+      Math.sin(yaw) *
+        right;
+
+
+    const speed =
+      7 * dt;
+
+
+    const nextX =
+      local.x +
+      dx *
+      speed;
+
+
+    const nextZ =
+      local.z +
+      dz *
+      speed;
+
+
+    if(
+      !blocked(
+        nextX,
+        local.z
+      )
+    ){
+
+      local.x =
+        Math.max(
+          -47,
+          Math.min(
+            47,
+            nextX
+          )
+        );
+
+    }
+
+
+    if(
+      !blocked(
+        local.x,
+        nextZ
+      )
+    ){
+
+      local.z =
+        Math.max(
+          -47,
+          Math.min(
+            47,
+            nextZ
+          )
+        );
+
+    }
+
+
+    local.rot =
+      yaw;
+
+
+    socket.emit(
+      "move",
+      local
+    );
+
+
+    updateCamera();
+
+  }
+
+
+  renderer.render(
+    scene,
+    camera
+  );
+
+}
+
+
+animate();
+
+
+/* =========================
+   화면 크기
+========================= */
+
+addEventListener(
+  "resize",
+  () => {
+
+    camera.aspect =
+      innerWidth /
+      innerHeight;
+
+
+    camera.updateProjectionMatrix();
+
+
+    renderer.setSize(
+      innerWidth,
+      innerHeight
+    );
+
+  }
+);
+
+</script>
+
+</body>
+</html>
