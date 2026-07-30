@@ -2,67 +2,63 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <title>CHASE 404</title>
 
 <style>
-html, body {
-    margin: 0;
-    padding: 0;
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-    background: #000;
-    font-family: Consolas, monospace;
+html,body{
+    margin:0;
+    width:100%;
+    height:100%;
+    overflow:hidden;
+    background:#000;
+    font-family:Consolas, monospace;
 }
 
-#ui {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
+canvas{
+    display:block;
 }
 
-#menu {
-    pointer-events: auto;
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    text-align: center;
-    color: white;
+#menu{
+    position:absolute;
+    top:50%;
+    left:50%;
+    transform:translate(-50%,-50%);
+    color:white;
+    text-align:center;
 }
 
-h1 {
-    font-size: 50px;
-    margin-bottom: 30px;
-    color: #00ff66;
+h1{
+    font-size:55px;
+    color:#00ff66;
+    margin-bottom:30px;
 }
 
-input, button {
-    padding: 12px;
-    margin: 5px;
-    font-size: 18px;
-    background: #111;
-    color: white;
-    border: 1px solid #00ff66;
+input,button{
+    padding:12px;
+    margin:5px;
+    font-size:18px;
+    background:#111;
+    color:white;
+    border:1px solid #00ff66;
 }
 
-button:hover {
+button:hover{
     background:#00ff66;
     color:black;
 }
 
-#info {
+#status{
+    margin-top:15px;
+    color:#00ff66;
+}
+
+#info{
     position:absolute;
     top:10px;
     left:10px;
     color:white;
-    font-size:16px;
 }
 </style>
 
@@ -71,34 +67,217 @@ button:hover {
 
 <body>
 
-<div id="ui">
 
-    <div id="menu">
-        <h1>CHASE 404</h1>
+<div id="menu">
 
-        <input id="roomInput" placeholder="방 코드">
+<h1>CHASE 404</h1>
 
-        <button id="playBtn">
-            PLAY
-        </button>
+<button id="createBtn">
+방 만들기
+</button>
 
-        <p>
-            WASD 이동 · 마우스 시점
-        </p>
+<br>
 
-    </div>
+<input id="roomCode" placeholder="방 코드">
+
+<button id="joinBtn">
+참가
+</button>
 
 
-    <div id="info"></div>
+<div id="status">
+대기중...
+</div>
 
 </div>
 
 
-<!-- Socket.io -->
+<div id="info"></div>
+
+
 <script src="/socket.io/socket.io.js"></script>
 
 
-<!-- 게임 코드 -->
+<script type="module">
+
+import * as THREE from 
+"https://cdn.jsdelivr.net/npm/three@0.178.0/build/three.module.js";
+
+
+const socket = io();
+
+
+const menu = document.getElementById("menu");
+const status = document.getElementById("status");
+
+
+const createBtn =
+document.getElementById("createBtn");
+
+
+const joinBtn =
+document.getElementById("joinBtn");
+
+
+const roomCode =
+document.getElementById("roomCode");
+
+
+
+createBtn.onclick = ()=>{
+
+    socket.emit("createRoom");
+
+    status.innerHTML =
+    "방 생성중...";
+
+};
+
+
+
+joinBtn.onclick = ()=>{
+
+    const code =
+    roomCode.value.trim();
+
+
+    if(!code){
+        status.innerHTML =
+        "방 코드를 입력하세요";
+        return;
+    }
+
+
+    socket.emit(
+        "joinRoom",
+        code
+    );
+
+    status.innerHTML =
+    "참가 요청중...";
+};
+
+
+
+socket.on(
+"roomCreated",
+(code)=>{
+
+    status.innerHTML =
+    "방 코드 : "+code;
+
+});
+
+
+socket.on(
+"joined",
+()=>{
+
+    menu.style.display="none";
+
+    startGame();
+
+});
+
+
+
+
+
+function startGame(){
+
+
+const scene =
+new THREE.Scene();
+
+
+scene.background =
+new THREE.Color(0x111111);
+
+
+
+const camera =
+new THREE.PerspectiveCamera(
+75,
+innerWidth/innerHeight,
+0.1,
+1000
+);
+
+
+camera.position.z=5;
+
+
+
+const renderer =
+new THREE.WebGLRenderer();
+
+
+renderer.setSize(
+innerWidth,
+innerHeight
+);
+
+
+document.body.appendChild(
+renderer.domElement
+);
+
+
+
+const light =
+new THREE.DirectionalLight(
+0xffffff,
+2
+);
+
+scene.add(light);
+
+
+
+const geo =
+new THREE.BoxGeometry(
+1,1,1
+);
+
+
+const mat =
+new THREE.MeshStandardMaterial(
+{
+color:0x00ff66
+}
+);
+
+
+const player =
+new THREE.Mesh(
+geo,
+mat
+);
+
+
+scene.add(player);
+
+
+
+function loop(){
+
+requestAnimationFrame(loop);
+
+renderer.render(
+scene,
+camera
+);
+
+}
+
+loop();
+
+
+}
+
+
+
+</script>
 
 
 </body>
